@@ -131,11 +131,21 @@
   <ItemGroup>
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="VkDevice.cpp" />
+    <ClCompile Include="VkPipeline.cpp" />
+    <ClCompile Include="VkSwapChain.cpp" />
     <ClCompile Include="VkWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.hpp" />
+    <ClInclude Include="VkDevice.hpp" />
+    <ClInclude Include="VkPipeline.hpp" />
+    <ClInclude Include="VkSwapChain.hpp" />
     <ClInclude Include="VkWindow.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="simple_shader.frag" />
+    <None Include="simple_shader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

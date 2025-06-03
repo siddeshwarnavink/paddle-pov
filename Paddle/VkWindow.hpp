@@ -15,6 +15,10 @@ namespace Vk
 		~Window();
 		bool ShouldClose() { return glfwWindowShouldClose(window); }
 		void PollEvents() { glfwPollEvents(); }
+		void CreateWindowSurface(VkInstance instance, VkSurfaceKHR* surface);
+		VkExtent2D getExtent() {
+			return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+		}
 
 	private:
 		GLFWwindow* window;
