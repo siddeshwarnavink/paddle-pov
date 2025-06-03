@@ -1,6 +1,9 @@
 #include "Game.hpp"
 #include "Block.hpp"
 #include "GameEntity.hpp"
+#include "GameCamera.hpp"
+
+#include <GLFW/glfw3.h>
 
 #include <stdexcept>
 #include <array>
@@ -18,9 +21,7 @@ namespace Paddle
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
-
-		entities.emplace_back(std::make_unique<Block>(device));
-
+		CreateBlocks();
 		CreateCommandBuffers();
 	}
 
@@ -32,9 +33,49 @@ namespace Paddle
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
 	}
 
+	void Game::CreateBlocks() {
+		entities.emplace_back(std::make_unique<Block>(device, 0.5f, 0.5f, 0.5f));
+
+		// TODO: Render a grid of blocks.
+
+		/*
+		float spacing = 0.6f;
+		float startX = -spacing * 2;
+		float startY = -spacing * 2;
+		for (int i = 0; i < 5; ++i) {
+			for (int j = 0; j < 5; ++j) {
+				float x = startX + i * spacing;
+				float y = startY + j * spacing;
+				entities.emplace_back(std::make_unique<Block>(device, x, y, 0.0f));
+			}
+		}
+		*/
+	}
+
 	void Game::run() {
 		while (!window.ShouldClose()) {
 			window.PollEvents();
+
+			//
+			// Camera movement logic
+			//
+			if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A)) {
+				camera.MoveLeft(0.05f);
+				for (auto& entity : entities) {
+					auto pos = entity->GetPosition();
+					pos.x -= 0.05f;
+					entity->SetPosition(pos);
+				}
+			}
+			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D)) {
+				camera.MoveRight(0.05f);
+				for (auto& entity : entities) {
+					auto pos = entity->GetPosition();
+					pos.x += 0.05f;
+					entity->SetPosition(pos);
+				}
+			}
+
 			DrawFrame();
 		}
 		vkDeviceWaitIdle(device.device());
@@ -137,6 +178,9 @@ namespace Paddle
 
 			pipeline->bind(commandBuffers[i]);
 
+			//
+			// Rendering all entities in the scene
+			//
 			for (auto& entity : entities) {
 				entity->Bind(commandBuffers[i]);
 				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);

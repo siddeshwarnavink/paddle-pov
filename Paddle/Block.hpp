@@ -14,9 +14,9 @@ struct Vertex {
 namespace Paddle {
 	class Block : public GameEntity {
 	public:
-		Block(Vk::Device& device);
+		Block(Vk::Device& device, float x, float y, float z);
 		~Block() override;
-		
+
 		Block(const Block&) = delete;
 		Block& operator=(const Block&) = delete;
 

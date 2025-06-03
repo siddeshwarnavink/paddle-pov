@@ -3,6 +3,7 @@
 #include "VkSwapChain.hpp"
 #include "VkDevice.hpp"
 #include "Block.hpp"
+#include "GameCamera.hpp"
 
 #include <memory>
 #include <vector>
@@ -30,6 +31,7 @@ namespace Paddle {
 		void run();
 
 	private:
+		void CreateBlocks();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
@@ -62,5 +64,6 @@ namespace Paddle {
 		VkDescriptorSet descriptorSet;
 
 		std::vector<std::unique_ptr<GameEntity>> entities;
+		GameCamera camera;
 	};
 }

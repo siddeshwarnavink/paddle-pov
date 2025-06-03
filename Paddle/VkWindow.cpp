@@ -28,4 +28,8 @@ namespace Vk {
 			throw std::runtime_error("failed to craete window surface");
 		}
 	}
+
+	bool Window::IsKeyPressed(int key) const {
+		return glfwGetKey(window, key) == GLFW_PRESS;
+	}
 }
