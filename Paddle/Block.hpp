@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VkDevice.hpp"
+#include "GameEntity.hpp"
 
 struct Vertex {
 	glm::vec3 pos;
@@ -11,14 +12,18 @@ struct Vertex {
 };
 
 namespace Paddle {
-	class Block {
+	class Block : public GameEntity {
 	public:
 		Block(Vk::Device& device);
-		~Block();
+		~Block() override;
+		
+		Block(const Block&) = delete;
+		Block& operator=(const Block&) = delete;
 
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
-		void Bind(VkCommandBuffer commandBuffer);
+		void Bind(VkCommandBuffer commandBuffer) override;
+		void Draw(VkCommandBuffer commandBuffer) override;
 		uint32_t GetIndexCount() const;
 
 	private:

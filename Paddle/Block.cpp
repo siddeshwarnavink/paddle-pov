@@ -73,6 +73,10 @@ namespace Paddle {
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     }
 
+    void Block::Draw(VkCommandBuffer commandBuffer) {
+        vkCmdDrawIndexed(commandBuffer, GetIndexCount(), 1, 0, 0, 0);
+    }
+
     uint32_t Block::GetIndexCount() const {
         return indexCount;
     }

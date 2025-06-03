@@ -45,6 +45,9 @@
     <ClCompile Include="Block.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GameEntity.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.hpp">
@@ -63,6 +66,9 @@
       <Filter>Header Files\vk</Filter>
     </ClInclude>
     <ClInclude Include="Block.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameEntity.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

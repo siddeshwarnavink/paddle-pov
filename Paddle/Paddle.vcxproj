@@ -131,6 +131,7 @@
   <ItemGroup>
     <ClCompile Include="Block.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameEntity.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="VkDevice.cpp" />
     <ClCompile Include="VkPipeline.cpp" />
@@ -140,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="Block.hpp" />
     <ClInclude Include="Game.hpp" />
+    <ClInclude Include="GameEntity.hpp" />
     <ClInclude Include="VkDevice.hpp" />
     <ClInclude Include="VkPipeline.hpp" />
     <ClInclude Include="VkSwapChain.hpp" />
