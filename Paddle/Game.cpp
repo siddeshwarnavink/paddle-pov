@@ -10,16 +10,17 @@ namespace Paddle
 	Game::Game()
 		: window(WIDTH, HEIGHT, "Paddle Game"),
 		device(window),
-		swapChain(device, window.getExtent()),
-		block(device)
+		swapChain(device, window.getExtent())
 	{
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
 		CreateDescriptorSet();
 		CreatePipelineLayout();
-
 		CreatePipeline();
+
+		entities.emplace_back(std::make_unique<Block>(device));
+
 		CreateCommandBuffers();
 	}
 
@@ -135,9 +136,12 @@ namespace Paddle
 			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 			pipeline->bind(commandBuffers[i]);
-			block.Bind(commandBuffers[i]);
-			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-			vkCmdDrawIndexed(commandBuffers[i], block.GetIndexCount(), 1, 0, 0, 0);
+
+			for (auto& entity : entities) {
+				entity->Bind(commandBuffers[i]);
+				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+				entity->Draw(commandBuffers[i]);
+			}
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -170,11 +174,8 @@ namespace Paddle
 	}
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
-		// TODO: For testing
-		block.SetRotation(block.GetRotation() + glm::vec3(0.0f, glm::radians(1.0f), 0.0f));
-
 		UniformBufferObject ubo{};
-		ubo.model = block.GetModelMatrix();
+		ubo.model = entities.empty() ? glm::mat4(1.0f) : entities[0]->GetModelMatrix();
 		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;

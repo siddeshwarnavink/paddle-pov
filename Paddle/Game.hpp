@@ -61,6 +61,6 @@ namespace Paddle {
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet descriptorSet;
 
-		Block block;
+		std::vector<std::unique_ptr<GameEntity>> entities;
 	};
 }
