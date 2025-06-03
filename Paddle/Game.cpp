@@ -1,60 +1,28 @@
 #include "Game.hpp"
+#include "Block.hpp"
 
 #include <stdexcept>
 #include <array>
 
-struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 color;
-};
-
-const std::vector<Vertex> cubeVertices = {
-    // Front face
-    {{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{ 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}},
-    // Back face
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
-    {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
-    {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-    {{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f, 0.0f}},
-};
-
-const std::vector<uint16_t> cubeIndices = {
-    // Front
-    0, 1, 2, 2, 3, 0,
-    // Right
-    1, 5, 6, 6, 2, 1,
-    // Back
-    5, 4, 7, 7, 6, 5,
-    // Left
-    4, 0, 3, 3, 7, 4,
-    // Top
-    3, 2, 6, 6, 7, 3,
-    // Bottom
-    4, 5, 1, 1, 0, 4
-};
-
 namespace Paddle
 {
-	Game::Game() {
+	Game::Game()
+		: window(WIDTH, HEIGHT, "Paddle Game"),
+		device(window),
+		swapChain(device, window.getExtent()),
+		block(device)
+	{
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
 		CreateDescriptorSet();
 		CreatePipelineLayout();
-		CreateVertexBuffer();
-		CreateIndexBuffer();
+
 		CreatePipeline();
 		CreateCommandBuffers();
 	}
 
 	Game::~Game() {
-		vkDestroyBuffer(device.device(), vertexBuffer, nullptr);
-		vkFreeMemory(device.device(), vertexBufferMemory, nullptr);
-		vkDestroyBuffer(device.device(), indexBuffer, nullptr);
-		vkFreeMemory(device.device(), indexBufferMemory, nullptr);
 		vkDestroyBuffer(device.device(), uniformBuffer, nullptr);
 		vkFreeMemory(device.device(), uniformBufferMemory, nullptr);
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
@@ -166,12 +134,9 @@ namespace Paddle
 			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 			pipeline->bind(commandBuffers[i]);
-			VkBuffer vertexBuffers[] = { vertexBuffer };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			block.Bind(commandBuffers[i]);
 			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-			vkCmdDrawIndexed(commandBuffers[i], indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(commandBuffers[i], block.GetIndexCount(), 1, 0, 0, 0);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -191,35 +156,6 @@ namespace Paddle
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("failed to present swap chain image!");
 		}
-	}
-
-	void Game::CreateVertexBuffer() {
-		VkDeviceSize bufferSize = sizeof(cubeVertices[0]) * cubeVertices.size();
-		device.createBuffer(
-			bufferSize,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			vertexBuffer,
-			vertexBufferMemory);
-		void* data;
-		vkMapMemory(device.device(), vertexBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, cubeVertices.data(), (size_t)bufferSize);
-		vkUnmapMemory(device.device(), vertexBufferMemory);
-	}
-
-	void Game::CreateIndexBuffer() {
-		indexCount = static_cast<uint32_t>(cubeIndices.size());
-		VkDeviceSize bufferSize = sizeof(cubeIndices[0]) * cubeIndices.size();
-		device.createBuffer(
-			bufferSize,
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			indexBuffer,
-			indexBufferMemory);
-		void* data;
-		vkMapMemory(device.device(), indexBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, cubeIndices.data(), (size_t)bufferSize);
-		vkUnmapMemory(device.device(), indexBufferMemory);
 	}
 
 	void Game::CreateUniformBuffer() {

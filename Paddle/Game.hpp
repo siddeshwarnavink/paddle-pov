@@ -2,6 +2,7 @@
 #include "VkPipeline.hpp"
 #include "VkSwapChain.hpp"
 #include "VkDevice.hpp"
+#include "Block.hpp"
 
 #include <memory>
 #include <vector>
@@ -59,5 +60,7 @@ namespace Paddle {
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet descriptorSet;
+
+		Block block;
 	};
 }

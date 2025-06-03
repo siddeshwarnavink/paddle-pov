@@ -129,6 +129,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Block.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="VkDevice.cpp" />
@@ -137,6 +138,7 @@
     <ClCompile Include="VkWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Block.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="VkDevice.hpp" />
     <ClInclude Include="VkPipeline.hpp" />
