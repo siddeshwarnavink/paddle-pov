@@ -19,6 +19,7 @@ namespace Paddle {
         glm::vec3 GetPosition() const;
         glm::vec3 GetRotation() const;
         glm::mat4 GetModelMatrix() const;
+
     protected:
         glm::vec3 position;
         glm::vec3 rotation;

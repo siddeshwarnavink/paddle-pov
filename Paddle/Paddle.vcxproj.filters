@@ -82,10 +82,10 @@
     <None Include="compile_shaders.bat">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="block.frag">
+    <None Include="shader.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="block.vert">
+    <None Include="shader.vert">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>

@@ -11,11 +11,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace Paddle {
-	struct UniformBufferObject {
+	struct CameraUbo {
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
 
+	/*
 	struct LightBufferObject {
 		glm::vec3 lightPos;
 		float _pad1;
@@ -24,6 +25,7 @@ namespace Paddle {
 		glm::vec3 lightColor;
 		float _pad3;
 	};
+	*/
 
 	class Game {
 	public:
@@ -65,14 +67,14 @@ namespace Paddle {
 		VkDeviceMemory indexBufferMemory;
 		uint32_t indexCount = 0;
 
-		VkBuffer uniformBuffer;
-		VkDeviceMemory uniformBufferMemory;
+		VkBuffer cameraUbo;
+		VkDeviceMemory cameraUboMemory;
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorPool descriptorPool;
-		VkDescriptorSet descriptorSet;
+		VkDescriptorSet cameraDescriptorSet;
 
-		VkBuffer lightBuffer;
-		VkDeviceMemory lightBufferMemory;
+		//VkBuffer lightBuffer;
+		//VkDeviceMemory lightBufferMemory;
 
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		GameCamera camera;

@@ -1,6 +1,6 @@
 #version 450
 layout(location = 0) in vec3 fragColor;
-layout(location = 1) in vec3 fragNormal;
+//layout(location = 1) in vec3 fragNormal;
 layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 1) uniform Light {
@@ -10,6 +10,7 @@ layout(set = 0, binding = 1) uniform Light {
 } light;
 
 void main() {
+    /*
     vec3 norm = normalize(fragNormal);
     vec3 lightDir = normalize(light.lightPos - vec3(gl_FragCoord.xyz));
     float diff = max(dot(norm, lightDir), 0.0);
@@ -29,4 +30,6 @@ void main() {
     
     vec3 result = ambient + diffuse + specular + emissive;
     outColor = vec4(result, 1.0);
+    */
+    outColor = vec4(fragColor, 1.0);
 }
