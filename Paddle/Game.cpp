@@ -34,11 +34,6 @@ namespace Paddle
 	}
 
 	void Game::CreateBlocks() {
-		entities.emplace_back(std::make_unique<Block>(device, 0.5f, 0.5f, 0.5f));
-
-		// TODO: Render a grid of blocks.
-
-		/*
 		float spacing = 0.6f;
 		float startX = -spacing * 2;
 		float startY = -spacing * 2;
@@ -49,7 +44,6 @@ namespace Paddle
 				entities.emplace_back(std::make_unique<Block>(device, x, y, 0.0f));
 			}
 		}
-		*/
 	}
 
 	void Game::run() {
@@ -83,12 +77,16 @@ namespace Paddle
 
 	void Game::CreatePipelineLayout() {
 		CreateDescriptorSetLayout();
+		VkPushConstantRange pushConstantRange{};
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = sizeof(glm::mat4);
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = 1;
 		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-		pipelineLayoutInfo.pushConstantRangeCount = 0;
-		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) !=
 			VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
@@ -178,10 +176,9 @@ namespace Paddle
 
 			pipeline->bind(commandBuffers[i]);
 
-			//
-			// Rendering all entities in the scene
-			//
 			for (auto& entity : entities) {
+				glm::mat4 model = entity->GetModelMatrix();
+				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
 				entity->Bind(commandBuffers[i]);
 				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 				entity->Draw(commandBuffers[i]);
@@ -219,8 +216,9 @@ namespace Paddle
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
 		UniformBufferObject ubo{};
-		ubo.model = entities.empty() ? glm::mat4(1.0f) : entities[0]->GetModelMatrix();
-		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::vec3 camPos = camera.GetPosition();
+		glm::vec3 camTarget = camera.GetTarget();
+		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
 		ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;
 		void* data;

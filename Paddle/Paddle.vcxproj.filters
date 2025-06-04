@@ -48,6 +48,9 @@
     <ClCompile Include="GameEntity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GameCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.hpp">
@@ -71,12 +74,18 @@
     <ClInclude Include="GameEntity.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GameCamera.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="simple_shader.vert">
+    <None Include="compile_shaders.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="block.frag">
       <Filter>Source Files\shaders</Filter>
     </None>
-    <None Include="simple_shader.frag">
+    <None Include="block.vert">
       <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>

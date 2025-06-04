@@ -27,6 +27,7 @@ namespace Paddle {
 
 	Block::Block(Vk::Device& device, float x, float y, float z) : device(device) {
 		SetPosition(glm::vec3(x, y, z));
+		SetRotation(glm::vec3(0.0f));
 		CreateVertexBuffer();
 		CreateIndexBuffer();
 	}
