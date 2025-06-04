@@ -9,12 +9,13 @@
 struct Vertex {
 	glm::vec3 pos;
 	glm::vec3 color;
+	glm::vec3 normal;
 };
 
 namespace Paddle {
 	class Block : public GameEntity {
 	public:
-		Block(Vk::Device& device, float x, float y, float z);
+		Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color);
 		~Block() override;
 
 		Block(const Block&) = delete;
@@ -28,11 +29,14 @@ namespace Paddle {
 
 	private:
 		Vk::Device& device;
+		glm::vec3 color;
 		VkBuffer vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
 		VkBuffer indexBuffer;
 		VkDeviceMemory indexBufferMemory;
 		uint32_t indexCount;
+
+		std::vector<Vertex> verticesInstance;
 
 		static const std::vector<Vertex> vertices;
 		static const std::vector<uint16_t> indices;

@@ -4,6 +4,7 @@
 #include "GameCamera.hpp"
 
 #include <GLFW/glfw3.h>
+#include <random>
 
 #include <stdexcept>
 #include <array>
@@ -28,20 +29,32 @@ namespace Paddle
 	Game::~Game() {
 		vkDestroyBuffer(device.device(), uniformBuffer, nullptr);
 		vkFreeMemory(device.device(), uniformBufferMemory, nullptr);
+		vkDestroyBuffer(device.device(), lightBuffer, nullptr);
+		vkFreeMemory(device.device(), lightBufferMemory, nullptr);
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
 	}
 
 	void Game::CreateBlocks() {
-		float spacing = 0.6f;
+		float spacing = 0.65f;
 		float startX = -spacing * 2;
 		float startY = -spacing * 2;
+		std::vector<glm::vec3> colors = {
+			{1.0f, 0.0f, 0.0f}, // red
+			{0.0f, 1.0f, 0.0f}, // green
+			{0.0f, 0.0f, 1.0f}, // blue
+			{1.0f, 1.0f, 0.0f}  // yellow
+		};
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
 		for (int i = 0; i < 5; ++i) {
 			for (int j = 0; j < 5; ++j) {
 				float x = startX + i * spacing;
 				float y = startY + j * spacing;
-				entities.emplace_back(std::make_unique<Block>(device, x, y, 0.0f));
+				glm::vec3 color = colors[dis(gen)];
+				entities.emplace_back(std::make_unique<Block>(device, x, y, 0.0f, color));
 			}
 		}
 	}
@@ -102,8 +115,8 @@ namespace Paddle
 		return bindingDescription;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -112,6 +125,10 @@ namespace Paddle
 		attributeDescriptions[1].location = 1;
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = offsetof(Vertex, color);
+		attributeDescriptions[2].binding = 0;
+		attributeDescriptions[2].location = 2;
+		attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[2].offset = offsetof(Vertex, normal);
 		return attributeDescriptions;
 	}
 
@@ -212,6 +229,14 @@ namespace Paddle
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			uniformBuffer,
 			uniformBufferMemory);
+
+		VkDeviceSize lightBufferSize = sizeof(LightBufferObject);
+		device.createBuffer(
+			lightBufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			lightBuffer,
+			lightBufferMemory);
 	}
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
@@ -225,6 +250,14 @@ namespace Paddle
 		vkMapMemory(device.device(), uniformBufferMemory, 0, sizeof(ubo), 0, &data);
 		memcpy(data, &ubo, sizeof(ubo));
 		vkUnmapMemory(device.device(), uniformBufferMemory);
+
+		LightBufferObject light{};
+		light.lightPos = glm::vec3(2.0f, 2.0f, 2.0f); 
+		light.viewPos = camPos;
+		light.lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+		vkMapMemory(device.device(), lightBufferMemory, 0, sizeof(light), 0, &data);
+		memcpy(data, &light, sizeof(light));
+		vkUnmapMemory(device.device(), lightBufferMemory);
 	}
 
 	void Game::CreateDescriptorSetLayout() {
@@ -235,10 +268,18 @@ namespace Paddle
 		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
 
+		VkDescriptorSetLayoutBinding lightLayoutBinding{};
+		lightLayoutBinding.binding = 1;
+		lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		lightLayoutBinding.descriptorCount = 1;
+		lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		lightLayoutBinding.pImmutableSamplers = nullptr;
+
+		std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, lightLayoutBinding };
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &uboLayoutBinding;
+		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+		layoutInfo.pBindings = bindings.data();
 
 		if (vkCreateDescriptorSetLayout(device.device(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor set layout!");
@@ -246,14 +287,16 @@ namespace Paddle
 	}
 
 	void Game::CreateDescriptorPool() {
-		VkDescriptorPoolSize poolSize{};
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = 1;
+		std::array<VkDescriptorPoolSize, 2> poolSizes{};
+		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[0].descriptorCount = 1;
+		poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[1].descriptorCount = 1;
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+		poolInfo.pPoolSizes = poolSizes.data();
 		poolInfo.maxSets = 1;
 
 		if (vkCreateDescriptorPool(device.device(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
@@ -277,15 +320,27 @@ namespace Paddle
 		bufferInfo.offset = 0;
 		bufferInfo.range = sizeof(UniformBufferObject);
 
-		VkWriteDescriptorSet descriptorWrite{};
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = descriptorSet;
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.descriptorCount = 1;
-		descriptorWrite.pBufferInfo = &bufferInfo;
+		VkDescriptorBufferInfo lightBufferInfo{};
+		lightBufferInfo.buffer = lightBuffer;
+		lightBufferInfo.offset = 0;
+		lightBufferInfo.range = sizeof(LightBufferObject);
 
-		vkUpdateDescriptorSets(device.device(), 1, &descriptorWrite, 0, nullptr);
+		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[0].dstSet = descriptorSet;
+		descriptorWrites[0].dstBinding = 0;
+		descriptorWrites[0].dstArrayElement = 0;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorCount = 1;
+		descriptorWrites[0].pBufferInfo = &bufferInfo;
+		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[1].dstSet = descriptorSet;
+		descriptorWrites[1].dstBinding = 1;
+		descriptorWrites[1].dstArrayElement = 0;
+		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[1].descriptorCount = 1;
+		descriptorWrites[1].pBufferInfo = &lightBufferInfo;
+
+		vkUpdateDescriptorSets(device.device(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 	}
 }

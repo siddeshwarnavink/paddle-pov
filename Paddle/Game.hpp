@@ -16,6 +16,15 @@ namespace Paddle {
 		glm::mat4 proj;
 	};
 
+	struct LightBufferObject {
+		glm::vec3 lightPos;
+		float _pad1;
+		glm::vec3 viewPos;
+		float _pad2;
+		glm::vec3 lightColor;
+		float _pad3;
+	};
+
 	class Game {
 	public:
 		static constexpr int WIDTH = 800;
@@ -61,6 +70,9 @@ namespace Paddle {
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet descriptorSet;
+
+		VkBuffer lightBuffer;
+		VkDeviceMemory lightBufferMemory;
 
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		GameCamera camera;

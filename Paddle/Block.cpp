@@ -4,16 +4,16 @@
 
 namespace Paddle {
 	const std::vector<Vertex> Block::vertices = {
-		// Front face
-		{{-0.25f, -0.25f,  0.25f}, {1.0f, 0.0f, 0.0f}},
-		{{ 0.25f, -0.25f,  0.25f}, {0.0f, 1.0f, 0.0f}},
-		{{ 0.25f,  0.25f,  0.25f}, {0.0f, 0.0f, 1.0f}},
-		{{-0.25f,  0.25f,  0.25f}, {1.0f, 1.0f, 0.0f}},
-		// Back face
-		{{-0.25f, -0.25f, -0.25f}, {1.0f, 0.0f, 1.0f}},
-		{{ 0.25f, -0.25f, -0.25f}, {0.0f, 1.0f, 1.0f}},
-		{{ 0.25f,  0.25f, -0.25f}, {1.0f, 1.0f, 1.0f}},
-		{{-0.25f,  0.25f, -0.25f}, {0.0f, 0.0f, 0.0f}},
+		// Front face (normal: 0, 0, 1)
+		{{-0.25f, -0.25f,  0.25f}, {0,0,0}, {0.0f, 0.0f, 1.0f}},
+		{{ 0.25f, -0.25f,  0.25f}, {0,0,0}, {0.0f, 0.0f, 1.0f}},
+		{{ 0.25f,  0.25f,  0.25f}, {0,0,0}, {0.0f, 0.0f, 1.0f}},
+		{{-0.25f,  0.25f,  0.25f}, {0,0,0}, {0.0f, 0.0f, 1.0f}},
+		// Back face (normal: 0, 0, -1)
+		{{-0.25f, -0.25f, -0.25f}, {0,0,0}, {0.0f, 0.0f, -1.0f}},
+		{{ 0.25f, -0.25f, -0.25f}, {0,0,0}, {0.0f, 0.0f, -1.0f}},
+		{{ 0.25f,  0.25f, -0.25f}, {0,0,0}, {0.0f, 0.0f, -1.0f}},
+		{{-0.25f,  0.25f, -0.25f}, {0,0,0}, {0.0f, 0.0f, -1.0f}},
 	};
 
 	const std::vector<uint16_t> Block::indices = {
@@ -25,9 +25,12 @@ namespace Paddle {
 		4, 5, 1, 1, 0, 4
 	};
 
-	Block::Block(Vk::Device& device, float x, float y, float z) : device(device) {
+	Block::Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color)
+		: device(device), color(color) {
 		SetPosition(glm::vec3(x, y, z));
 		SetRotation(glm::vec3(0.0f));
+		verticesInstance = vertices;
+		for (auto& v : verticesInstance) v.color = color;
 		CreateVertexBuffer();
 		CreateIndexBuffer();
 	}
@@ -40,7 +43,7 @@ namespace Paddle {
 	}
 
 	void Block::CreateVertexBuffer() {
-		VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+		VkDeviceSize bufferSize = sizeof(verticesInstance[0]) * verticesInstance.size();
 		device.createBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -49,7 +52,7 @@ namespace Paddle {
 			vertexBufferMemory);
 		void* data;
 		vkMapMemory(device.device(), vertexBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, vertices.data(), (size_t)bufferSize);
+		memcpy(data, verticesInstance.data(), (size_t)bufferSize);
 		vkUnmapMemory(device.device(), vertexBufferMemory);
 	}
 
