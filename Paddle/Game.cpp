@@ -5,6 +5,8 @@
 #include "GameCamera.hpp"
 
 #include <GLFW/glfw3.h>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
 #include <random>
 
 #include <stdexcept>
@@ -70,30 +72,82 @@ namespace Paddle
 		}
 	}
 
+	bool CheckAABBSphereCollision(const glm::vec3& boxMin, const glm::vec3& boxMax, const glm::vec3& sphereCenter, float sphereRadius) {
+		glm::vec3 closestPoint = glm::clamp(sphereCenter, boxMin, boxMax);
+		float distanceSquared = glm::distance2(closestPoint, sphereCenter);
+		return distanceSquared < (sphereRadius * sphereRadius);
+	}
+
 	void Game::run() {
 		while (!window.ShouldClose()) {
 			window.PollEvents();
 
 			//
-			// Camera movement logic
+			// Update ball
 			//
-			if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A)) {
-				camera.MoveLeft(0.05f);
-				for (auto& entity : entities) {
-					auto pos = entity->GetPosition();
-					pos.x -= 0.05f;
-					entity->SetPosition(pos);
-				}
-			}
-			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D)) {
-				camera.MoveRight(0.05f);
-				for (auto& entity : entities) {
-					auto pos = entity->GetPosition();
-					pos.x += 0.05f;
-					entity->SetPosition(pos);
+			static_cast<Paddle::Ball*>(ballEntity.get())->Update();
+
+			//
+			// Collision detection
+			//
+			float ballRadius = 0.25f;
+			glm::vec3 ballPos = ballEntity->GetPosition();
+
+			for (auto& entity : entities) {
+				glm::vec3 blockPos = entity->GetPosition();
+				glm::vec3 blockMin = blockPos - glm::vec3(0.25f);
+				glm::vec3 blockMax = blockPos + glm::vec3(0.25f);
+
+				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
+					//
+					// Deflect the ball
+					//
+					auto *ball = static_cast<Paddle::Ball*>(ballEntity.get());
+					auto vel = ball->GetVelocity();
+
+					glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
+					glm::vec3 normal = glm::normalize(ballPos - closestPoint);
+
+					if (glm::length(normal) < 0.0001f) {
+						normal = glm::vec3(1, 0, 0);
+					}
+
+					vel = vel - 2.0f * glm::dot(vel, normal) * normal;
+					ball->SetVelocity(vel);
 				}
 			}
 
+			//
+			// Camera movement logic
+			//
+			if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A)) {
+				for (auto& entity : entities) {
+					auto pos = entity->GetPosition();
+					pos.y += 0.05f;
+					entity->SetPosition(pos);
+				}
+
+				{
+					auto pos = ballEntity->GetPosition();
+					pos.y += 0.05f;
+					ballEntity->SetPosition(pos);
+				}
+			}
+			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D)) {
+				for (auto& entity : entities) {
+					auto pos = entity->GetPosition();
+					pos.y -= 0.05f;
+					entity->SetPosition(pos);
+				}
+
+				{
+					auto pos = ballEntity->GetPosition();
+					pos.y -= 0.05f;
+					ballEntity->SetPosition(pos);
+				}
+			}
+
+			CreateCommandBuffers();
 			DrawFrame();
 		}
 		vkDeviceWaitIdle(device.device());

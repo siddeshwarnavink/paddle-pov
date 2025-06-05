@@ -15,6 +15,7 @@ namespace Paddle {
 		verticesInstance = GenerateVertices();
 		CreateVertexBuffer();
 		CreateIndexBuffer();
+		velocity = glm::vec3(-1.0f, 0.5f, 0.0f);
 	}
 
 	Ball::~Ball() {
@@ -22,6 +23,21 @@ namespace Paddle {
 		vkFreeMemory(device.device(), vertexBufferMemory, nullptr);
 		vkDestroyBuffer(device.device(), indexBuffer, nullptr);
 		vkFreeMemory(device.device(), indexBufferMemory, nullptr);
+	}
+
+	void Ball::Update() {
+		glm::vec3 pos = GetPosition();
+		pos += velocity * 0.01f; // TODO: Later move 0.01 as speed in Game class
+								 // and we can increase speed as game goes on.
+		SetPosition(pos);
+	}
+
+	glm::vec3 Ball::GetVelocity() {
+		return velocity;
+	}
+
+	void Ball::SetVelocity(glm::vec3 updatedVelocity) {
+		velocity = updatedVelocity;
 	}
 
 	std::vector<Vertex> Ball::GenerateVertices() {
@@ -50,8 +66,8 @@ namespace Paddle {
 
 	std::vector<uint32_t> Ball::GenerateIndices() {
 		std::vector<uint32_t> indices;
-		for (int i = 0; i < stacks; ++i) {            
-			for (int j = 0; j < slices; ++j) {   
+		for (int i = 0; i < stacks; ++i) {
+			for (int j = 0; j < slices; ++j) {
 				int first = i * (slices + 1) + j;
 				int second = first + slices + 1;
 

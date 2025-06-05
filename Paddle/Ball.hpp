@@ -21,6 +21,10 @@ namespace Paddle {
 		void Draw(VkCommandBuffer commandBuffer) override;
 		uint32_t GetIndexCount() const;
 
+		void Update();
+		glm::vec3 GetVelocity();
+		void SetVelocity(glm::vec3 updatedVelocity);
+
 	private:
 		Vk::Device& device;
 		VkBuffer vertexBuffer;
@@ -28,11 +32,12 @@ namespace Paddle {
 		VkBuffer indexBuffer;
 		VkDeviceMemory indexBufferMemory;
 		uint32_t indexCount;
-	
+
 		std::vector<Vertex> verticesInstance;
 
 		static const std::vector<Vertex> vertices;
 		static const std::vector<uint16_t> indices;
+		glm::vec3 velocity;
 
 		std::vector<Vertex> GenerateVertices();
 		std::vector<uint32_t> GenerateIndices();

@@ -1,7 +1,7 @@
 #include "GameCamera.hpp"
 
 namespace Paddle {
-	GameCamera::GameCamera() : position(5.0f, 0.0f, 0.0f), target(0.0f, 0.0f, 0.0f) {}
+	GameCamera::GameCamera() : position(6.0f, 0.0f, 0.0f), target(0.0f, 0.0f, 0.0f) {}
 
 	void GameCamera::MoveLeft(float amount) {
 		glm::vec3 direction = glm::normalize(target - position);
