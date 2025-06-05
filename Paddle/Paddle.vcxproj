@@ -129,6 +129,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Ball.cpp" />
     <ClCompile Include="Block.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameCamera.cpp" />
@@ -140,6 +141,7 @@
     <ClCompile Include="VkWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Ball.hpp" />
     <ClInclude Include="Block.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="GameCamera.hpp" />

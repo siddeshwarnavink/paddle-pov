@@ -42,6 +42,7 @@ namespace Paddle {
 
 	private:
 		void CreateBlocks();
+		void CreateBall();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
@@ -76,6 +77,7 @@ namespace Paddle {
 		//VkBuffer lightBuffer;
 		//VkDeviceMemory lightBufferMemory;
 
+		std::unique_ptr<GameEntity> ballEntity;
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		GameCamera camera;
 	};

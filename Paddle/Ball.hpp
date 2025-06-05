@@ -7,13 +7,13 @@
 #include "GameEntity.hpp"
 
 namespace Paddle {
-	class Block : public GameEntity {
+	class Ball : public GameEntity {
 	public:
-		Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color);
-		~Block() override;
+		Ball(Vk::Device& device, float x, float y, float z);
+		~Ball() override;
 
-		Block(const Block&) = delete;
-		Block& operator=(const Block&) = delete;
+		Ball(const Ball&) = delete;
+		Ball& operator=(const Ball&) = delete;
 
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
@@ -23,16 +23,18 @@ namespace Paddle {
 
 	private:
 		Vk::Device& device;
-		glm::vec3 color;
 		VkBuffer vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
 		VkBuffer indexBuffer;
 		VkDeviceMemory indexBufferMemory;
 		uint32_t indexCount;
-
+	
 		std::vector<Vertex> verticesInstance;
 
 		static const std::vector<Vertex> vertices;
 		static const std::vector<uint16_t> indices;
+
+		std::vector<Vertex> GenerateVertices();
+		std::vector<uint32_t> GenerateIndices();
 	};
 }

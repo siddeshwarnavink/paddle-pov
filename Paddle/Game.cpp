@@ -1,5 +1,6 @@
 #include "Game.hpp"
 #include "Block.hpp"
+#include "Ball.hpp"
 #include "GameEntity.hpp"
 #include "GameCamera.hpp"
 
@@ -23,6 +24,7 @@ namespace Paddle
 		CreatePipelineLayout();
 		CreatePipeline();
 		CreateBlocks();
+		CreateBall();
 		CreateCommandBuffers();
 	}
 
@@ -34,6 +36,10 @@ namespace Paddle
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
+	}
+
+	void Game::CreateBall() {
+		ballEntity = std::make_unique<Ball>(device, 3.0f, 0.0f, 0.0f);
 	}
 
 	void Game::CreateBlocks() {
@@ -200,12 +206,28 @@ namespace Paddle
 
 			pipeline->bind(commandBuffers[i]);
 
+
+			//
+			// Draw all entities
+			//
 			for (auto& entity : entities) {
 				glm::mat4 model = entity->GetModelMatrix();
 				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
 				entity->Bind(commandBuffers[i]);
 				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
 				entity->Draw(commandBuffers[i]);
+			}
+
+
+			//
+			// Draw the ball
+			//
+			{
+				glm::mat4 model = ballEntity->GetModelMatrix();
+				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
+				ballEntity->Bind(commandBuffers[i]);
+				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+				ballEntity->Draw(commandBuffers[i]);
 			}
 
 			vkCmdEndRenderPass(commandBuffers[i]);
