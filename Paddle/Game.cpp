@@ -33,8 +33,6 @@ namespace Paddle
 	Game::~Game() {
 		vkDestroyBuffer(device.device(), cameraUbo, nullptr);
 		vkFreeMemory(device.device(), cameraUboMemory, nullptr);
-		//vkDestroyBuffer(device.device(), lightBuffer, nullptr);
-		//vkFreeMemory(device.device(), lightBufferMemory, nullptr);
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
@@ -51,19 +49,21 @@ namespace Paddle
 
 		//
 		// Random block color
+		// https://www.color-hex.com/color-palette/3811
 		//
 		std::vector<glm::vec3> colors = {
-			{1.0f, 0.0f, 0.0f}, // red
-			{0.0f, 1.0f, 0.0f}, // green
-			{0.0f, 0.0f, 1.0f}, // blue
-			{1.0f, 1.0f, 0.0f}  // yellow
+			{124.0f / 255.0f, 156.0f / 255.0f, 228.0f / 255.0f}, // #7c9ce4
+			{100.0f / 255.0f, 230.0f / 255.0f, 215.0f / 255.0f}, // #64e6d7
+			{231.0f / 255.0f, 235.0f / 255.0f, 185.0f / 255.0f}, // #e7ebb9
+			{179.0f / 255.0f, 240.0f / 255.0f, 255.0f / 255.0f}, // #b3f0ff
+			{30.0f / 255.0f, 151.0f / 255.0f, 158.0f / 255.0f},  // #1e979e
 		};
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
 
-		for (int i = 0; i < 5; ++i) {
-			for (int j = 0; j < 5; ++j) {
+		for (int i = 0; i < 3; ++i) {
+			for (int j = 0; j < 8; ++j) {
 				float x = startX + i * spacing;
 				float y = startY + j * spacing;
 				glm::vec3 color = colors[dis(gen)];
@@ -180,22 +180,28 @@ namespace Paddle
 		return bindingDescription;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+	static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
 		attributeDescriptions[1].binding = 0;
 		attributeDescriptions[1].location = 1;
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = offsetof(Vertex, color);
-		/*
+
 		attributeDescriptions[2].binding = 0;
 		attributeDescriptions[2].location = 2;
 		attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[2].offset = offsetof(Vertex, normal);
-		*/
+
+		attributeDescriptions[3].binding = 0;
+		attributeDescriptions[3].location = 3;
+		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[3].offset = offsetof(Vertex, uv);
+
 		return attributeDescriptions;
 	}
 
@@ -315,16 +321,6 @@ namespace Paddle
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			cameraUbo,
 			cameraUboMemory);
-
-		/*
-		VkDeviceSize lightBufferSize = sizeof(LightBufferObject);
-		device.createBuffer(
-			lightBufferSize,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			lightBuffer,
-			lightBufferMemory);
-		*/
 	}
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
@@ -341,16 +337,6 @@ namespace Paddle
 		vkMapMemory(device.device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
 		memcpy(data, &ubo, sizeof(ubo));
 		vkUnmapMemory(device.device(), cameraUboMemory);
-
-		/*
-		LightBufferObject light{};
-		light.lightPos = glm::vec3(2.0f, 2.0f, 2.0f);
-		light.viewPos = camPos;
-		light.lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
-		vkMapMemory(device.device(), lightBufferMemory, 0, sizeof(light), 0, &data);
-		memcpy(data, &light, sizeof(light));
-		vkUnmapMemory(device.device(), lightBufferMemory);
-		*/
 	}
 
 	void Game::CreateDescriptorSetLayout() {
@@ -361,18 +347,8 @@ namespace Paddle
 		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
 
-		/*
-		VkDescriptorSetLayoutBinding lightLayoutBinding{};
-		lightLayoutBinding.binding = 1;
-		lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		lightLayoutBinding.descriptorCount = 1;
-		lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		lightLayoutBinding.pImmutableSamplers = nullptr;
-		*/
-
 		std::array<VkDescriptorSetLayoutBinding, 1> bindings = {
 			uboLayoutBinding
-			//lightLayoutBinding
 		};
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -420,32 +396,6 @@ namespace Paddle
 		bufferInfo.buffer = cameraUbo;
 		bufferInfo.offset = 0;
 		bufferInfo.range = sizeof(CameraUbo);
-
-		/*
-		VkDescriptorBufferInfo lightBufferInfo{};
-		lightBufferInfo.buffer = lightBuffer;
-		lightBufferInfo.offset = 0;
-		lightBufferInfo.range = sizeof(LightBufferObject);
-
-		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = cameraDescriptorSet;
-		descriptorWrites[0].dstBinding = 0;
-		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[0].descriptorCount = 1;
-		descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = cameraDescriptorSet;
-		descriptorWrites[1].dstBinding = 1;
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pBufferInfo = &lightBufferInfo;
-
-		vkUpdateDescriptorSets(device.device(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-		*/
 
 		VkWriteDescriptorSet descriptorWrite{};
 

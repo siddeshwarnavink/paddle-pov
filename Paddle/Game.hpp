@@ -74,9 +74,6 @@ namespace Paddle {
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet cameraDescriptorSet;
 
-		//VkBuffer lightBuffer;
-		//VkDeviceMemory lightBufferMemory;
-
 		std::unique_ptr<GameEntity> ballEntity;
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		GameCamera camera;

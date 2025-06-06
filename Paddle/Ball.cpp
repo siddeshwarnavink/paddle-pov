@@ -56,9 +56,11 @@ namespace Paddle {
 				float z = radius * sin(phi) * sin(theta);
 
 				glm::vec3 pos = glm::vec3(x, y, z);
-				glm::vec3 color = glm::vec3(1.0f, 0.0f, 0.0f);
+				glm::vec3 color = glm::vec3(194.0f / 255.f, 64.0f / 255.0f, 62.0f / 255.0f); // #c2403e
+				glm::vec3 normal = glm::normalize(pos);
+				glm::vec2 uv = glm::vec2((float)j / slices, (float)i / stacks);
 
-				vertices.push_back({ pos, color });
+				vertices.push_back({ pos, color, normal, uv });
 			}
 		}
 		return vertices;
