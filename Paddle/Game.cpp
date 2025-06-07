@@ -3,12 +3,14 @@
 #include "Ball.hpp"
 #include "GameEntity.hpp"
 #include "GameCamera.hpp"
+#include "PlayerPaddle.hpp"
 
 #include <GLFW/glfw3.h>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 #include <random>
 
+#include <iostream>
 #include <stdexcept>
 #include <array>
 
@@ -27,6 +29,8 @@ namespace Paddle
 		CreatePipeline();
 		CreateBlocks();
 		CreateBall();
+		CreatePaddle();
+		CreateWalls();
 		CreateCommandBuffers();
 	}
 
@@ -72,15 +76,57 @@ namespace Paddle
 		}
 	}
 
+	void Game::CreateWalls() {
+		const float sideOffset = 3.0f;
+
+		auto leftWall = std::make_unique<Wall>(device, 6.0f, -sideOffset, 0.0f);
+		wallEntities.emplace_back(std::move(leftWall));
+
+		auto rightWall = std::make_unique<Wall>(device, 6.0f, sideOffset + 2.0f, 0.0f);
+		wallEntities.emplace_back(std::move(rightWall));
+
+		// Wall behind all the blocks
+		auto frontWall = std::make_unique<Wall>(device, -4.0f, sideOffset, 0.0f);
+		frontWall->SetRotation(glm::vec3(0, 0, 30));
+		wallEntities.emplace_back(std::move(frontWall));
+	}
+
 	bool CheckAABBSphereCollision(const glm::vec3& boxMin, const glm::vec3& boxMax, const glm::vec3& sphereCenter, float sphereRadius) {
 		glm::vec3 closestPoint = glm::clamp(sphereCenter, boxMin, boxMax);
 		float distanceSquared = glm::distance2(closestPoint, sphereCenter);
 		return distanceSquared < (sphereRadius * sphereRadius);
 	}
 
+	void Game::UpdateAllEntitiesPosition(const glm::vec3& delta) {
+		for (auto& entity : entities) {
+			auto pos = entity->GetPosition();
+			entity->SetPosition(pos + delta);
+		}
+
+		for (auto& entity : wallEntities) {
+			auto pos = entity->GetPosition();
+			entity->SetPosition(pos + delta);
+		}
+
+		{
+			auto pos = ballEntity->GetPosition();
+			ballEntity->SetPosition(pos + delta);
+		}
+	}
+
 	void Game::run() {
+
+        bool prevF12Pressed = false;
 		while (!window.ShouldClose()) {
 			window.PollEvents();
+
+			//
+			// Toggle debug
+			//
+            bool f12Pressed = window.IsKeyPressed(GLFW_KEY_F12);
+            if (f12Pressed && !prevF12Pressed)
+                showDebug = !showDebug;
+            prevF12Pressed = f12Pressed;
 
 			//
 			// Update ball
@@ -88,23 +134,19 @@ namespace Paddle
 			static_cast<Paddle::Ball*>(ballEntity.get())->Update();
 
 			//
-			// Collision detection
+			// Block Collision
 			//
-			float ballRadius = 0.25f;
-			glm::vec3 ballPos = ballEntity->GetPosition();
+			auto *ball = static_cast<Paddle::Ball*>(ballEntity.get());
+			auto vel = ball->GetVelocity();
+			const float ballRadius = ball->GetRadius();
+			const glm::vec3 ballPos = ballEntity->GetPosition();
 
 			for (auto& entity : entities) {
 				glm::vec3 blockPos = entity->GetPosition();
 				glm::vec3 blockMin = blockPos - glm::vec3(0.25f);
 				glm::vec3 blockMax = blockPos + glm::vec3(0.25f);
 
-				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
-					//
-					// Deflect the ball
-					//
-					auto *ball = static_cast<Paddle::Ball*>(ballEntity.get());
-					auto vel = ball->GetVelocity();
-
+				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {	
 					glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
 					glm::vec3 normal = glm::normalize(ballPos - closestPoint);
 
@@ -118,35 +160,76 @@ namespace Paddle
 			}
 
 			//
+			// Paddle Collision
+			//
+			{
+				glm::vec3 blockPos = paddleEntity->GetPosition();
+				glm::vec3 blockMin = blockPos - glm::vec3(0.25f);
+				glm::vec3 blockMax = blockPos + glm::vec3(0.25f);
+
+				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
+					glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
+					glm::vec3 normal = glm::normalize(ballPos - closestPoint);
+
+					if (glm::length(normal) < 0.0001f) {
+						normal = glm::vec3(1, 0, 0);
+					}
+
+					vel = vel - 2.0f * glm::dot(vel, normal) * normal;
+					ball->SetVelocity(vel);
+				}
+
+			}
+
+			//
+			// Wall collision
+			//
+			{ 
+				for (size_t i = 0; i < wallEntities.size(); ++i) {
+					auto& entity = wallEntities[i];
+					glm::vec3 blockPos = entity->GetPosition();
+
+					// TODO: Fix this shit
+					glm::vec3 halfExtents;
+					const float wallLength = 10.0f;
+					if(i < 2) // Left & Right wall
+						halfExtents = glm::vec3(wallLength,  1.0f, 0.1f);
+					else // Front wall
+						halfExtents = glm::vec3( 0.1f, wallLength,1.0f);
+
+
+					glm::vec3 blockMin = blockPos - halfExtents;
+					glm::vec3 blockMax = blockPos + halfExtents;
+
+					if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
+						glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
+						glm::vec3 normal = glm::normalize(ballPos - closestPoint);
+
+						if (glm::length(normal) < 0.0001f) {
+							normal = glm::vec3(1, 0, 0);
+						}
+
+						vel = vel - 2.0f * glm::dot(vel, normal) * normal;
+						ball->SetVelocity(vel);
+					}
+				}
+			}
+
+			//
 			// Camera movement logic
 			//
-			if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A)) {
-				for (auto& entity : entities) {
-					auto pos = entity->GetPosition();
-					pos.y += 0.05f;
-					entity->SetPosition(pos);
-				}
-
-				{
-					auto pos = ballEntity->GetPosition();
-					pos.y += 0.05f;
-					ballEntity->SetPosition(pos);
-				}
-			}
-			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D)) {
-				for (auto& entity : entities) {
-					auto pos = entity->GetPosition();
-					pos.y -= 0.05f;
-					entity->SetPosition(pos);
-				}
-
-				{
-					auto pos = ballEntity->GetPosition();
-					pos.y -= 0.05f;
-					ballEntity->SetPosition(pos);
-				}
+			if (showDebug) {
+				if (window.IsKeyPressed(GLFW_KEY_UP) || window.IsKeyPressed(GLFW_KEY_W))
+					UpdateAllEntitiesPosition(glm::vec3(0.05f, 0.0f, 0.0f));
+				if (window.IsKeyPressed(GLFW_KEY_DOWN) || window.IsKeyPressed(GLFW_KEY_S))
+					UpdateAllEntitiesPosition(glm::vec3(-0.05f, 0.0f, 0.0f));
 			}
 
+			if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
+				UpdateAllEntitiesPosition(glm::vec3(0.0f, 0.05f, 0.0f));
+			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
+				UpdateAllEntitiesPosition(glm::vec3(0.0f, -0.05f, 0.0f));
+			
 			CreateCommandBuffers();
 			DrawFrame();
 		}
@@ -226,6 +309,10 @@ namespace Paddle
 			pipelineConfig);
 	}
 
+	void Game::CreatePaddle() {
+		paddleEntity = std::make_unique<PlayerPaddle>(device, 5.5f, 0.0f, 0.0f);
+	}
+
 	void Game::CreateCommandBuffers() {
 		commandBuffers.resize(swapChain.imageCount());
 
@@ -278,6 +365,19 @@ namespace Paddle
 				entity->Draw(commandBuffers[i]);
 			}
 
+			//
+			// Draw walls
+			//
+			if(showDebug) {
+				for (auto& entity : wallEntities) {
+					glm::mat4 model = entity->GetModelMatrix();
+					vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
+					entity->Bind(commandBuffers[i]);
+					vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+					entity->Draw(commandBuffers[i]);
+				}
+			}
+
 
 			//
 			// Draw the ball
@@ -288,6 +388,17 @@ namespace Paddle
 				ballEntity->Bind(commandBuffers[i]);
 				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
 				ballEntity->Draw(commandBuffers[i]);
+			}
+
+			//
+			// Draw the paddle 
+			//
+			if (showDebug) {
+				glm::mat4 model = paddleEntity->GetModelMatrix();
+				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
+				paddleEntity->Bind(commandBuffers[i]);
+				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+				paddleEntity->Draw(commandBuffers[i]);
 			}
 
 			vkCmdEndRenderPass(commandBuffers[i]);
@@ -332,6 +443,7 @@ namespace Paddle
 		glm::vec3 camTarget = camera.GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
 		ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.1f, 10.0f);
+		//ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.5f, 10.0f);
 		ubo.proj[1][1] *= -1;
 		void* data;
 		vkMapMemory(device.device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
@@ -411,5 +523,4 @@ namespace Paddle
 	}
 }
 
-// TODO: Proper non-flat-color shaders for Block
-// TODO: Setup light source
+// TODO: Make debug render things transparent

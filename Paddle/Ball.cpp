@@ -4,7 +4,6 @@
 #include <glm/gtc/constants.hpp>
 
 namespace Paddle {
-	const float radius = 0.25f;
 	const uint32_t slices = 64;
 	const uint32_t stacks = 32;
 
@@ -16,6 +15,7 @@ namespace Paddle {
 		CreateVertexBuffer();
 		CreateIndexBuffer();
 		velocity = glm::vec3(-1.0f, 0.5f, 0.0f);
+		radius = 0.25;		
 	}
 
 	Ball::~Ball() {
@@ -25,9 +25,14 @@ namespace Paddle {
 		vkFreeMemory(device.device(), indexBufferMemory, nullptr);
 	}
 
+
+	float Ball::GetRadius() {
+		return radius;
+	}
+
 	void Ball::Update() {
 		glm::vec3 pos = GetPosition();
-		pos += velocity * 0.01f; // TODO: Later move 0.01 as speed in Game class
+		pos += velocity * 0.04f; // TODO: Later move 0.01 as speed in Game class
 								 // and we can increase speed as game goes on.
 		SetPosition(pos);
 	}

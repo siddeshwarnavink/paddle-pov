@@ -4,6 +4,8 @@
 #include "VkDevice.hpp"
 #include "Block.hpp"
 #include "GameCamera.hpp"
+#include "PlayerPaddle.hpp"
+#include "Wall.hpp"
 
 #include <memory>
 #include <vector>
@@ -15,17 +17,6 @@ namespace Paddle {
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
-
-	/*
-	struct LightBufferObject {
-		glm::vec3 lightPos;
-		float _pad1;
-		glm::vec3 viewPos;
-		float _pad2;
-		glm::vec3 lightColor;
-		float _pad3;
-	};
-	*/
 
 	class Game {
 	public:
@@ -43,6 +34,8 @@ namespace Paddle {
 	private:
 		void CreateBlocks();
 		void CreateBall();
+		void CreatePaddle();
+		void CreateWalls();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
@@ -54,6 +47,7 @@ namespace Paddle {
 		void CreateDescriptorPool();
 		void CreateDescriptorSet();
 		void UpdateUniformBuffer(uint32_t currentImage);
+		void UpdateAllEntitiesPosition(const glm::vec3& delta);
 
 		Vk::Window window{ WIDTH, HEIGHT, "Paddle Game" };
 		Vk::Device device{ window };
@@ -74,7 +68,12 @@ namespace Paddle {
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet cameraDescriptorSet;
 
+		bool showDebug = false;
+
 		std::unique_ptr<GameEntity> ballEntity;
+		std::unique_ptr<PlayerPaddle> paddleEntity;
+		//std::unique_ptr<Wall> backWallEntity;
+		std::vector<std::unique_ptr<GameEntity>> wallEntities;
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		GameCamera camera;
 	};

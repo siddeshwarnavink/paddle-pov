@@ -7,13 +7,13 @@
 #include "GameEntity.hpp"
 
 namespace Paddle {
-	class Ball : public GameEntity {
+	class Wall : public GameEntity {
 	public:
-		Ball(Vk::Device& device, float x, float y, float z);
-		~Ball() override;
+		Wall(Vk::Device& device, float x, float y, float z);
+		~Wall() override;
 
-		Ball(const Ball&) = delete;
-		Ball& operator=(const Ball&) = delete;
+		Wall(const Wall&) = delete;
+		Wall& operator=(const Wall&) = delete;
 
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
@@ -21,14 +21,9 @@ namespace Paddle {
 		void Draw(VkCommandBuffer commandBuffer) override;
 		uint32_t GetIndexCount() const;
 
-		void Update();
-		glm::vec3 GetVelocity();
-		void SetVelocity(glm::vec3 updatedVelocity);
-
-		float GetRadius();
-
 	private:
 		Vk::Device& device;
+		glm::vec3 color;
 		VkBuffer vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
 		VkBuffer indexBuffer;
@@ -39,11 +34,5 @@ namespace Paddle {
 
 		static const std::vector<Vertex> vertices;
 		static const std::vector<uint16_t> indices;
-
-		float radius = 0.25;
-		glm::vec3 velocity;
-
-		std::vector<Vertex> GenerateVertices();
-		std::vector<uint32_t> GenerateIndices();
 	};
 }
