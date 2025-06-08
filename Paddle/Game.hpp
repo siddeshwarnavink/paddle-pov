@@ -56,6 +56,8 @@ namespace Paddle {
 		void UpdateAllEntitiesPosition(const glm::vec3& delta);
 		void ResetGame();
 		void ResetBlocks();
+		void RenderScoreFont(std::string scoreText);
+		void RenderGameOverFont(std::string scoreText);
 
 		Vk::Window window{ WIDTH, HEIGHT, "Paddle Game" };
 		Vk::Device device{ window };
@@ -65,12 +67,6 @@ namespace Paddle {
 		std::unique_ptr<Vk::Pipeline> fontPipeline;
 		VkPipelineLayout fontPipelineLayout = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> commandBuffers;
-
-		VkBuffer vertexBuffer;
-		VkDeviceMemory vertexBufferMemory;
-		VkBuffer indexBuffer;
-		VkDeviceMemory indexBufferMemory;
-		uint32_t indexCount = 0;
 
 		VkBuffer cameraUbo;
 		VkDeviceMemory cameraUboMemory;
@@ -85,7 +81,6 @@ namespace Paddle {
 		std::unique_ptr<GameEntity> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
 		std::vector<std::unique_ptr<GameEntity>> wallEntities;
-		std::unique_ptr<GameEntity> backWallEntity;
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		std::unique_ptr<GameFont> font;
 		GameCamera camera;

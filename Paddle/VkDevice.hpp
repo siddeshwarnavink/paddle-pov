@@ -109,6 +109,8 @@ namespace Vk
 			VkImage& image,
 			VkDeviceMemory& imageMemory);
 
+		void SetObjectName(uint64_t handle, VkObjectType type, const std::string& name);
+
 		VkPhysicalDeviceProperties properties;
 
 	private:

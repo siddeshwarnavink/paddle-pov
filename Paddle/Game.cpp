@@ -99,11 +99,6 @@ namespace Paddle
 		auto frontWall = std::make_unique<Wall>(device, -4.0f, sideOffset, 0.0f);
 		frontWall->SetRotation(glm::vec3(0, 0, 30));
 		wallEntities.emplace_back(std::move(frontWall));
-
-		// Wall behind paddle
-		auto backWall = std::make_unique<Wall>(device, 6.0f, sideOffset, 0.0f);
-		backWall->SetRotation(glm::vec3(0, 0, 30));
-		backWallEntity = std::move(backWall);
 	}
 
 	void Game::CreateFont() {
@@ -131,72 +126,61 @@ namespace Paddle
 		}
 
 		{
-			auto pos = backWallEntity->GetPosition();
-			backWallEntity->SetPosition(pos + delta);
-		}
-
-		{
 			auto pos = ballEntity->GetPosition();
 			ballEntity->SetPosition(pos + delta);
 		}
 	}
 
 	void Game::ResetGame() {
-		if (ballEntity) {
-			ballEntity->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-			//static_cast<Ball*>(ballEntity.get())->SetVelocity(glm::vec3(-0.05f, 0.0f, 0.0f));
-		}
-
 		ResetBlocks();
 
-		if (paddleEntity) {
-			paddleEntity->SetPosition(glm::vec3(5.5f, 0.0f, 0.0f));
-		}
-		if (ballEntity) {
-			ballEntity->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-		}
-		for (size_t i = 0; i < wallEntities.size(); ++i) {
-			if (i == 0) wallEntities[i]->SetPosition(glm::vec3(6.0f, -3.0f, 0.0f));
-			else if (i == 1) wallEntities[i]->SetPosition(glm::vec3(6.0f, 5.0f, 0.0f));
-			else wallEntities[i]->SetPosition(glm::vec3(-4.0f, 3.0f, 0.0f));
-		}
-		if (backWallEntity) {
-			backWallEntity->SetPosition(glm::vec3(6.0f, 3.0f, 0.0f));
-		}
+		paddleEntity->SetPosition(glm::vec3(5.5f, 0.0f, 0.0f));
+		ballEntity->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
 
 		score = 0;
 		gameOver = false;
 	}
 
 	void Game::ResetBlocks() {
-		// Move all remaining blocks to pendingDeleteEntities for proper cleanup
-		for (auto& entity : entities) {
+		for (auto& entity : entities)
 			pendingDeleteEntities.push_back(std::move(entity));
-		}
 		entities.clear();
-		// Recreate blocks
 		CreateBlocks();
+	}
+
+	void Game::RenderScoreFont(std::string scoreText) {
+		font->AddText(scoreText, -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+	}
+
+	void Game::RenderGameOverFont(std::string scoreText) {
+		float scaleX = (float)swapChain.width() / WIDTH;
+		float scaleY = (float)swapChain.height() / HEIGHT;
+
+		font->AddText("Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f, glm::vec3(1.0f, 0.2f, 0.2f));
+		font->AddText(scoreText, -80.0f * scaleX, 150.0f * scaleY, 0.75f, glm::vec3(1.0f));
 	}
 
 	void Game::run() {
         bool prevF12Pressed = false;
+		bool prevGameOver = false;
+		int prevScore = -1;
+
 		while (!window.ShouldClose()) {
 			window.PollEvents();
 
 			//
 			// Toggle debug
 			//
-            bool f12Pressed = window.IsKeyPressed(GLFW_KEY_F12);
-            if (f12Pressed && !prevF12Pressed)
-                showDebug = !showDebug;
-            prevF12Pressed = f12Pressed;
+			bool f12Pressed = window.IsKeyPressed(GLFW_KEY_F12);
+			if (f12Pressed && !prevF12Pressed)
+				showDebug = !showDebug;
+			prevF12Pressed = f12Pressed;
 
 			//
 			// Update ball
 			//
 			if (!gameOver)
 				static_cast<Paddle::Ball*>(ballEntity.get())->Update();
-
 
 			//
 			// Block Collision
@@ -231,6 +215,20 @@ namespace Paddle
 				} else {
 					++it;
 				}
+			}
+
+			std::string scoreText = "Score: " + std::to_string(score);
+			//
+			// Reset Game
+			//
+			if(window.IsKeyPressed(GLFW_KEY_F11)) {
+				ResetGame();
+				font->ClearText();
+				RenderScoreFont(scoreText);
+				font->CreateVertexBuffer();
+				prevScore = score;
+				prevGameOver = gameOver;
+				continue;
 			}
 
 			//
@@ -306,39 +304,47 @@ namespace Paddle
 			}
 
 			//
-			// Font text
+			// Font rendering
 			//
 			font->ClearText();
-			std::string scoreText = "Score: " + std::to_string(score);
 
 			if(gameOver) {
-				float scaleX = (float)swapChain.width() / WIDTH;
-				float scaleY = (float)swapChain.height() / HEIGHT;
-
-				font->AddText("Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f, glm::vec3(1.0f, 0.2f, 0.2f));
-				font->AddText(scoreText, -80.0f * scaleX, 150.0f * scaleY, 0.75f, glm::vec3(1.0f));
+				RenderGameOverFont(scoreText);
 
 				//
 				// Game over keybindings
 				//
-				if (window.IsKeyPressed(GLFW_KEY_SPACE))
+				if (window.IsKeyPressed(GLFW_KEY_SPACE)) {
 					ResetGame();
+					font->ClearText();
+					RenderScoreFont(scoreText);
+					font->CreateVertexBuffer();
+					prevScore = score;
+					prevGameOver = gameOver;
+					continue;
+				}
 
 			} else {
-				font->AddText(scoreText, -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+				RenderScoreFont(scoreText);
 			}
 
-			font->CreateVertexBuffer();
+			if(prevScore != score || prevGameOver != gameOver) {
+				font->CreateVertexBuffer();
+			}
+			prevScore = score;
+			prevGameOver = gameOver;
 
 			CreateCommandBuffers();
 			DrawFrame();
+
+			if (entities.empty())
+				ResetBlocks();
 		}
 		vkDeviceWaitIdle(device.device());
 		pendingDeleteEntities.clear();
 	}
 
 	void Game::CreatePipelineLayout() {
-		CreateDescriptorSetLayout();
 		VkPushConstantRange pushConstantRange{};
 		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		pushConstantRange.offset = 0;
@@ -522,12 +528,6 @@ namespace Paddle
 					vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
 					entity->Draw(commandBuffers[i]);
 				}
-
-				glm::mat4 model = backWallEntity->GetModelMatrix();
-				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-				backWallEntity->Bind(commandBuffers[i]);
-				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
-				backWallEntity->Draw(commandBuffers[i]);
 			}
 
 			//
@@ -608,7 +608,6 @@ namespace Paddle
 		glm::vec3 camTarget = camera.GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
 		ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.1f, 10.0f);
-		//ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.5f, 10.0f);
 		ubo.proj[1][1] *= -1;
 		void* data;
 		vkMapMemory(device.device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
@@ -710,7 +709,6 @@ namespace Paddle
 	}
 }
 
-// TODO: Reset blocks after all cleared.
 // TODO: Increase ball speed by score.
 // TODO: Sound FX & Music
 // TODO: Block destroyed into pieces animation

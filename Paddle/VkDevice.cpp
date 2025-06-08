@@ -375,6 +375,20 @@ namespace Vk {
 		return details;
 	}
 
+	void Device::SetObjectName(uint64_t handle, VkObjectType type, const std::string& name)
+	{
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = type;
+		nameInfo.objectHandle = handle;
+		nameInfo.pObjectName = name.c_str();
+
+		auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(device_, "vkSetDebugUtilsObjectNameEXT");
+		if (func != nullptr) {
+			func(device_, &nameInfo);
+		}
+	}
+
 	VkFormat Device::findSupportedFormat(
 		const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
 		for (VkFormat format : candidates) {

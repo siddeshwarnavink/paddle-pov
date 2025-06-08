@@ -64,6 +64,7 @@ namespace Paddle {
 			stagingBuffer,
 			stagingBufferMemory
 		);
+		device.SetObjectName((uint64_t)stagingBuffer, VK_OBJECT_TYPE_BUFFER, "Font Staging Buffer");
 
 		void* data;
 		vkMapMemory(device.device(), stagingBufferMemory, 0, imageSize, 0, &data);
@@ -123,6 +124,16 @@ namespace Paddle {
 
 
 	void GameFont::CreateVertexBuffer() {
+		vkDeviceWaitIdle(device.device());
+		if (vertexBuffer != VK_NULL_HANDLE) {
+			vkDestroyBuffer(device.device(), vertexBuffer, nullptr);
+			vertexBuffer = VK_NULL_HANDLE;
+		}
+		if (vertexBufferMemory != VK_NULL_HANDLE) {
+			vkFreeMemory(device.device(), vertexBufferMemory, nullptr);
+			vertexBufferMemory = VK_NULL_HANDLE;
+		}
+
 		VkDeviceSize bufferSize = sizeof(verticesInstance[0]) * verticesInstance.size();
 		device.createBuffer(
 			bufferSize,
@@ -130,6 +141,7 @@ namespace Paddle {
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			vertexBuffer,
 			vertexBufferMemory);
+		device.SetObjectName((uint64_t)vertexBuffer, VK_OBJECT_TYPE_BUFFER, "Font Vertex Buffer");
 		void* data;
 		vkMapMemory(device.device(), vertexBufferMemory, 0, bufferSize, 0, &data);
 		memcpy(data, verticesInstance.data(), (size_t)bufferSize);

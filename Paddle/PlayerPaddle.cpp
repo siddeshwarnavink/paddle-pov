@@ -53,6 +53,7 @@ namespace Paddle {
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			vertexBuffer,
 			vertexBufferMemory);
+		device.SetObjectName((uint64_t)vertexBuffer, VK_OBJECT_TYPE_BUFFER, "Player Paddle Vertex Buffer");
 		void* data;
 		vkMapMemory(device.device(), vertexBufferMemory, 0, bufferSize, 0, &data);
 		memcpy(data, verticesInstance.data(), (size_t)bufferSize);
@@ -68,6 +69,7 @@ namespace Paddle {
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			indexBuffer,
 			indexBufferMemory);
+		device.SetObjectName((uint64_t)indexBuffer, VK_OBJECT_TYPE_BUFFER, "Player Paddle Index Buffer");
 		void* data;
 		vkMapMemory(device.device(), indexBufferMemory, 0, bufferSize, 0, &data);
 		memcpy(data, indices.data(), (size_t)bufferSize);
