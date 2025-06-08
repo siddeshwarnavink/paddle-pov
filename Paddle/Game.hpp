@@ -54,6 +54,8 @@ namespace Paddle {
 		void CreateDescriptorSet();
 		void UpdateUniformBuffer(uint32_t currentImage);
 		void UpdateAllEntitiesPosition(const glm::vec3& delta);
+		void ResetGame();
+		void ResetBlocks();
 
 		Vk::Window window{ WIDTH, HEIGHT, "Paddle Game" };
 		Vk::Device device{ window };
@@ -77,11 +79,13 @@ namespace Paddle {
 		VkDescriptorSet cameraDescriptorSet;
 
 		bool showDebug = false;
+		bool gameOver = false; 
 		
 		std::vector<std::unique_ptr<GameEntity>> pendingDeleteEntities;
 		std::unique_ptr<GameEntity> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
 		std::vector<std::unique_ptr<GameEntity>> wallEntities;
+		std::unique_ptr<GameEntity> backWallEntity;
 		std::vector<std::unique_ptr<GameEntity>> entities;
 		std::unique_ptr<GameFont> font;
 		GameCamera camera;

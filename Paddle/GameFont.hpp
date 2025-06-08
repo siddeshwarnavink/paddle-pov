@@ -20,6 +20,11 @@ namespace Paddle {
 		void Draw(VkCommandBuffer commandBuffer);
 
 		void AddText(const std::string& text, float x, float y, float scale, glm::vec3 color);
+		void AddText(const std::string& text) {
+			AddText(text, 0.0f, 0.0f, 1.0f, glm::vec3(1.0f));
+		}
+
+
 		void ClearText();
 		void SetText(const std::string& text, float x, float y, float scale, glm::vec3 color);
 		void CreateVertexBuffer();

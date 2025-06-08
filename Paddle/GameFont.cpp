@@ -19,42 +19,15 @@ namespace Paddle {
 	}
 
 	GameFont::~GameFont() {
-		if (vertexBuffer) {
-			vkDestroyBuffer(device.device(), vertexBuffer, nullptr);
-			vertexBuffer = VK_NULL_HANDLE;
-		}
-		if (vertexBufferMemory) {
-			vkFreeMemory(device.device(), vertexBufferMemory, nullptr);
-			vertexBufferMemory = VK_NULL_HANDLE;
-		}
-		if (stagingBuffer) {
-			vkDestroyBuffer(device.device(), stagingBuffer, nullptr);
-			stagingBuffer = VK_NULL_HANDLE;
-		}
-		if (stagingBufferMemory) {
-			vkFreeMemory(device.device(), stagingBufferMemory, nullptr);
-			stagingBufferMemory = VK_NULL_HANDLE;
-		}
-		if (fontImageView) {
-			vkDestroyImageView(device.device(), fontImageView, nullptr);
-			fontImageView = VK_NULL_HANDLE;
-		}
-		if (fontImage) {
-			vkDestroyImage(device.device(), fontImage, nullptr);
-			fontImage = VK_NULL_HANDLE;
-		}
-		if (fontImageMemory) {
-			vkFreeMemory(device.device(), fontImageMemory, nullptr);
-			fontImageMemory = VK_NULL_HANDLE;
-		}
-		if (fontSampler) {
-			vkDestroySampler(device.device(), fontSampler, nullptr);
-			fontSampler = VK_NULL_HANDLE;
-		}
-		if (bitmap) {
-			delete[] bitmap;
-			bitmap = nullptr;
-		}
+		vkDestroyBuffer(device.device(), vertexBuffer, nullptr);
+		vkFreeMemory(device.device(), vertexBufferMemory, nullptr);
+		vkDestroyBuffer(device.device(), stagingBuffer, nullptr);
+		vkFreeMemory(device.device(), stagingBufferMemory, nullptr);
+		vkDestroyImageView(device.device(), fontImageView, nullptr);
+		vkDestroyImage(device.device(), fontImage, nullptr);
+		vkFreeMemory(device.device(), fontImageMemory, nullptr);
+		vkDestroySampler(device.device(), fontSampler, nullptr);
+		delete[] bitmap;
 	}
 
 	void GameFont::CreateFont() {

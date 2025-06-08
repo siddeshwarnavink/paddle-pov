@@ -40,20 +40,7 @@ namespace Paddle
 	}
 
 	Game::~Game() {
-		//
-		// Destroy all entities
-		//
-		pendingDeleteEntities.clear();
-		entities.clear();
-		wallEntities.clear();
-		ballEntity.reset();
-		paddleEntity.reset();
-		font.reset();
-		if (!commandBuffers.empty()) {
-			vkFreeCommandBuffers(device.device(), device.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
-			commandBuffers.clear();
-		}
-
+		vkFreeCommandBuffers(device.device(), device.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 		vkDestroyBuffer(device.device(), cameraUbo, nullptr);
 		vkFreeMemory(device.device(), cameraUboMemory, nullptr);
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
@@ -112,11 +99,17 @@ namespace Paddle
 		auto frontWall = std::make_unique<Wall>(device, -4.0f, sideOffset, 0.0f);
 		frontWall->SetRotation(glm::vec3(0, 0, 30));
 		wallEntities.emplace_back(std::move(frontWall));
+
+		// Wall behind paddle
+		auto backWall = std::make_unique<Wall>(device, 6.0f, sideOffset, 0.0f);
+		backWall->SetRotation(glm::vec3(0, 0, 30));
+		backWallEntity = std::move(backWall);
 	}
 
 	void Game::CreateFont() {
 		font = std::make_unique<GameFont>(device);
-		font->AddText("Score: 0", -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+		font->AddText("Score: 0");
+		font->AddText("Game Over");
 		font->CreateVertexBuffer();
 	}
 
@@ -138,9 +131,51 @@ namespace Paddle
 		}
 
 		{
+			auto pos = backWallEntity->GetPosition();
+			backWallEntity->SetPosition(pos + delta);
+		}
+
+		{
 			auto pos = ballEntity->GetPosition();
 			ballEntity->SetPosition(pos + delta);
 		}
+	}
+
+	void Game::ResetGame() {
+		if (ballEntity) {
+			ballEntity->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
+			//static_cast<Ball*>(ballEntity.get())->SetVelocity(glm::vec3(-0.05f, 0.0f, 0.0f));
+		}
+
+		ResetBlocks();
+
+		if (paddleEntity) {
+			paddleEntity->SetPosition(glm::vec3(5.5f, 0.0f, 0.0f));
+		}
+		if (ballEntity) {
+			ballEntity->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
+		}
+		for (size_t i = 0; i < wallEntities.size(); ++i) {
+			if (i == 0) wallEntities[i]->SetPosition(glm::vec3(6.0f, -3.0f, 0.0f));
+			else if (i == 1) wallEntities[i]->SetPosition(glm::vec3(6.0f, 5.0f, 0.0f));
+			else wallEntities[i]->SetPosition(glm::vec3(-4.0f, 3.0f, 0.0f));
+		}
+		if (backWallEntity) {
+			backWallEntity->SetPosition(glm::vec3(6.0f, 3.0f, 0.0f));
+		}
+
+		score = 0;
+		gameOver = false;
+	}
+
+	void Game::ResetBlocks() {
+		// Move all remaining blocks to pendingDeleteEntities for proper cleanup
+		for (auto& entity : entities) {
+			pendingDeleteEntities.push_back(std::move(entity));
+		}
+		entities.clear();
+		// Recreate blocks
+		CreateBlocks();
 	}
 
 	void Game::run() {
@@ -159,7 +194,9 @@ namespace Paddle
 			//
 			// Update ball
 			//
-			static_cast<Paddle::Ball*>(ballEntity.get())->Update();
+			if (!gameOver)
+				static_cast<Paddle::Ball*>(ballEntity.get())->Update();
+
 
 			//
 			// Block Collision
@@ -168,6 +205,9 @@ namespace Paddle
 			auto vel = ball->GetVelocity();
 			const float ballRadius = ball->GetRadius();
 			const glm::vec3 ballPos = ballEntity->GetPosition();
+
+			if (ballPos.x > 6.0f)
+				gameOver = true;
 
 			for (auto it = entities.begin(); it != entities.end(); ) {
 				glm::vec3 blockPos = (*it)->GetPosition();
@@ -187,7 +227,7 @@ namespace Paddle
 
 					pendingDeleteEntities.push_back(std::move(*it));
 					it = entities.erase(it);
-					score += 10; // Increase score
+					score += 10;
 				} else {
 					++it;
 				}
@@ -251,23 +291,44 @@ namespace Paddle
 			//
 			// Camera movement logic
 			//
-			if (showDebug) {
-				if (window.IsKeyPressed(GLFW_KEY_UP) || window.IsKeyPressed(GLFW_KEY_W))
-					UpdateAllEntitiesPosition(glm::vec3(0.05f, 0.0f, 0.0f));
-				if (window.IsKeyPressed(GLFW_KEY_DOWN) || window.IsKeyPressed(GLFW_KEY_S))
-					UpdateAllEntitiesPosition(glm::vec3(-0.05f, 0.0f, 0.0f));
+			if(!gameOver || showDebug) {
+				if (showDebug) {
+					if (window.IsKeyPressed(GLFW_KEY_UP) || window.IsKeyPressed(GLFW_KEY_W))
+						UpdateAllEntitiesPosition(glm::vec3(0.05f, 0.0f, 0.0f));
+					if (window.IsKeyPressed(GLFW_KEY_DOWN) || window.IsKeyPressed(GLFW_KEY_S))
+						UpdateAllEntitiesPosition(glm::vec3(-0.05f, 0.0f, 0.0f));
+				}
+
+				if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
+					UpdateAllEntitiesPosition(glm::vec3(0.0f, 0.05f, 0.0f));
+				if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
+					UpdateAllEntitiesPosition(glm::vec3(0.0f, -0.05f, 0.0f));
 			}
 
-			if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
-				UpdateAllEntitiesPosition(glm::vec3(0.0f, 0.05f, 0.0f));
-			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
-				UpdateAllEntitiesPosition(glm::vec3(0.0f, -0.05f, 0.0f));
-
 			//
-			// Update font text
+			// Font text
 			//
+			font->ClearText();
 			std::string scoreText = "Score: " + std::to_string(score);
-			font->SetText(scoreText, -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+
+			if(gameOver) {
+				float scaleX = (float)swapChain.width() / WIDTH;
+				float scaleY = (float)swapChain.height() / HEIGHT;
+
+				font->AddText("Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f, glm::vec3(1.0f, 0.2f, 0.2f));
+				font->AddText(scoreText, -80.0f * scaleX, 150.0f * scaleY, 0.75f, glm::vec3(1.0f));
+
+				//
+				// Game over keybindings
+				//
+				if (window.IsKeyPressed(GLFW_KEY_SPACE))
+					ResetGame();
+
+			} else {
+				font->AddText(scoreText, -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+			}
+
+			font->CreateVertexBuffer();
 
 			CreateCommandBuffers();
 			DrawFrame();
@@ -461,6 +522,12 @@ namespace Paddle
 					vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
 					entity->Draw(commandBuffers[i]);
 				}
+
+				glm::mat4 model = backWallEntity->GetModelMatrix();
+				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
+				backWallEntity->Bind(commandBuffers[i]);
+				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+				backWallEntity->Draw(commandBuffers[i]);
 			}
 
 			//
@@ -643,7 +710,6 @@ namespace Paddle
 	}
 }
 
-// TODO: Game over logic.
 // TODO: Reset blocks after all cleared.
 // TODO: Increase ball speed by score.
 // TODO: Sound FX & Music
