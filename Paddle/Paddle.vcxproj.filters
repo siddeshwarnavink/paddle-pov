@@ -22,6 +22,9 @@
     <Filter Include="Source Files\shaders">
       <UniqueIdentifier>{7795fd4b-de8c-4e07-a8e1-60bab6df88e3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Vendor">
+      <UniqueIdentifier>{b6b312fd-df2a-410c-873f-de72cb578722}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -60,6 +63,9 @@
     <ClCompile Include="Wall.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GameFont.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.hpp">
@@ -94,6 +100,12 @@
     </ClInclude>
     <ClInclude Include="Wall.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameFont.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Vendor\stb_truetype.h">
+      <Filter>Header Files\Vendor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

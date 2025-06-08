@@ -21,12 +21,17 @@ namespace Paddle
 		device(window),
 		swapChain(device, window.getExtent())
 	{
+		score = 0;
+
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
+		CreateFont();
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
+		CreateFontPipelineLayout();
+		CreateFontPipeline();
 		CreateBlocks();
 		CreateBall();
 		CreatePaddle();
@@ -35,11 +40,29 @@ namespace Paddle
 	}
 
 	Game::~Game() {
+		//
+		// Destroy all entities
+		//
+		pendingDeleteEntities.clear();
+		entities.clear();
+		wallEntities.clear();
+		ballEntity.reset();
+		paddleEntity.reset();
+		font.reset();
+		if (!commandBuffers.empty()) {
+			vkFreeCommandBuffers(device.device(), device.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+			commandBuffers.clear();
+		}
+
 		vkDestroyBuffer(device.device(), cameraUbo, nullptr);
 		vkFreeMemory(device.device(), cameraUboMemory, nullptr);
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
+		if (fontPipelineLayout != VK_NULL_HANDLE) {
+			vkDestroyPipelineLayout(device.device(), fontPipelineLayout, nullptr);
+			fontPipelineLayout = VK_NULL_HANDLE;
+		}
 	}
 
 	void Game::CreateBall() {
@@ -91,6 +114,12 @@ namespace Paddle
 		wallEntities.emplace_back(std::move(frontWall));
 	}
 
+	void Game::CreateFont() {
+		font = std::make_unique<GameFont>(device);
+		font->AddText("Score: 0", -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+		font->CreateVertexBuffer();
+	}
+
 	bool CheckAABBSphereCollision(const glm::vec3& boxMin, const glm::vec3& boxMax, const glm::vec3& sphereCenter, float sphereRadius) {
 		glm::vec3 closestPoint = glm::clamp(sphereCenter, boxMin, boxMax);
 		float distanceSquared = glm::distance2(closestPoint, sphereCenter);
@@ -115,7 +144,6 @@ namespace Paddle
 	}
 
 	void Game::run() {
-
         bool prevF12Pressed = false;
 		while (!window.ShouldClose()) {
 			window.PollEvents();
@@ -141,12 +169,12 @@ namespace Paddle
 			const float ballRadius = ball->GetRadius();
 			const glm::vec3 ballPos = ballEntity->GetPosition();
 
-			for (auto& entity : entities) {
-				glm::vec3 blockPos = entity->GetPosition();
+			for (auto it = entities.begin(); it != entities.end(); ) {
+				glm::vec3 blockPos = (*it)->GetPosition();
 				glm::vec3 blockMin = blockPos - glm::vec3(0.25f);
 				glm::vec3 blockMax = blockPos + glm::vec3(0.25f);
 
-				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {	
+				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
 					glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
 					glm::vec3 normal = glm::normalize(ballPos - closestPoint);
 
@@ -156,6 +184,12 @@ namespace Paddle
 
 					vel = vel - 2.0f * glm::dot(vel, normal) * normal;
 					ball->SetVelocity(vel);
+
+					pendingDeleteEntities.push_back(std::move(*it));
+					it = entities.erase(it);
+					score += 10; // Increase score
+				} else {
+					++it;
 				}
 			}
 
@@ -184,12 +218,11 @@ namespace Paddle
 			//
 			// Wall collision
 			//
-			{ 
+			{
 				for (size_t i = 0; i < wallEntities.size(); ++i) {
 					auto& entity = wallEntities[i];
 					glm::vec3 blockPos = entity->GetPosition();
 
-					// TODO: Fix this shit
 					glm::vec3 halfExtents;
 					const float wallLength = 10.0f;
 					if(i < 2) // Left & Right wall
@@ -229,11 +262,18 @@ namespace Paddle
 				UpdateAllEntitiesPosition(glm::vec3(0.0f, 0.05f, 0.0f));
 			if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
 				UpdateAllEntitiesPosition(glm::vec3(0.0f, -0.05f, 0.0f));
-			
+
+			//
+			// Update font text
+			//
+			std::string scoreText = "Score: " + std::to_string(score);
+			font->SetText(scoreText, -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+
 			CreateCommandBuffers();
 			DrawFrame();
 		}
 		vkDeviceWaitIdle(device.device());
+		pendingDeleteEntities.clear();
 	}
 
 	void Game::CreatePipelineLayout() {
@@ -251,6 +291,22 @@ namespace Paddle
 		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) !=
 			VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
+		}
+	}
+
+	void Game::CreateFontPipelineLayout() {
+		VkPushConstantRange pushConstantRange{};
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = sizeof(glm::mat4);
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &fontPipelineLayout) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create font pipeline layout!");
 		}
 	}
 
@@ -309,6 +365,38 @@ namespace Paddle
 			pipelineConfig);
 	}
 
+	void Game::CreateFontPipeline() {
+		auto pipelineConfig = Vk::Pipeline::DefaultPipelineConfigInfo(swapChain.width(), swapChain.height());
+		pipelineConfig.renderPass = swapChain.getRenderPass();
+		pipelineConfig.pipelineLayout = fontPipelineLayout;
+		// Set up vertex input
+		static auto bindingDescription = getBindingDescription();
+		static auto attributeDescriptions = getAttributeDescriptions();
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+		pipelineConfig.vertexInputInfo = vertexInputInfo;
+		// Disable depth test/write for font
+		pipelineConfig.depthStencilInfo.depthTestEnable = VK_FALSE;
+		pipelineConfig.depthStencilInfo.depthWriteEnable = VK_FALSE;
+		// Enable alpha blending for font
+		pipelineConfig.colorBlendAttachment.blendEnable = VK_TRUE;
+		pipelineConfig.colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		pipelineConfig.colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		pipelineConfig.colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+		pipelineConfig.colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		pipelineConfig.colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		pipelineConfig.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		fontPipeline = std::make_unique<Vk::Pipeline>(
+			device,
+			"font.vert.spv",
+			"font.frag.spv",
+			pipelineConfig);
+	}
+
 	void Game::CreatePaddle() {
 		paddleEntity = std::make_unique<PlayerPaddle>(device, 5.5f, 0.0f, 0.0f);
 	}
@@ -353,10 +441,7 @@ namespace Paddle
 
 			pipeline->bind(commandBuffers[i]);
 
-
-			//
 			// Draw all entities
-			//
 			for (auto& entity : entities) {
 				glm::mat4 model = entity->GetModelMatrix();
 				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
@@ -378,7 +463,6 @@ namespace Paddle
 				}
 			}
 
-
 			//
 			// Draw the ball
 			//
@@ -391,7 +475,7 @@ namespace Paddle
 			}
 
 			//
-			// Draw the paddle 
+			// Draw the paddle
 			//
 			if (showDebug) {
 				glm::mat4 model = paddleEntity->GetModelMatrix();
@@ -400,6 +484,20 @@ namespace Paddle
 				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
 				paddleEntity->Draw(commandBuffers[i]);
 			}
+
+			//
+			// Font rendering
+			//
+			fontPipeline->bind(commandBuffers[i]);
+			font->Bind(commandBuffers[i]);
+			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+			glm::mat4 ortho = glm::ortho(
+				-float(swapChain.width()) / 2.0f, float(swapChain.width()) / 2.0f,
+				-float(swapChain.height()) / 2.0f, float(swapChain.height()) / 2.0f,
+				-1.0f, 1.0f
+			);
+			vkCmdPushConstants(commandBuffers[i], fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &ortho);
+			font->Draw(commandBuffers[i]);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -459,8 +557,15 @@ namespace Paddle
 		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
 
-		std::array<VkDescriptorSetLayoutBinding, 1> bindings = {
-			uboLayoutBinding
+		VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+		samplerLayoutBinding.binding = 1;
+		samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerLayoutBinding.descriptorCount = 1;
+		samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+		std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
+			uboLayoutBinding, samplerLayoutBinding
 		};
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -476,7 +581,7 @@ namespace Paddle
 		std::array<VkDescriptorPoolSize, 2> poolSizes{};
 		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		poolSizes[0].descriptorCount = 1;
-		poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		poolSizes[1].descriptorCount = 1;
 
 		VkDescriptorPoolCreateInfo poolInfo{};
@@ -492,7 +597,7 @@ namespace Paddle
 
 	void Game::CreateDescriptorSet() {
 		//
-		// Create descriptor set for camera
+		// Create descriptor set for camera and font sampler
 		//
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -509,18 +614,38 @@ namespace Paddle
 		bufferInfo.offset = 0;
 		bufferInfo.range = sizeof(CameraUbo);
 
-		VkWriteDescriptorSet descriptorWrite{};
+		VkWriteDescriptorSet descriptorWriteUBO{};
+		descriptorWriteUBO.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWriteUBO.dstSet = cameraDescriptorSet;
+		descriptorWriteUBO.dstBinding = 0;
+		descriptorWriteUBO.dstArrayElement = 0;
+		descriptorWriteUBO.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWriteUBO.descriptorCount = 1;
+		descriptorWriteUBO.pBufferInfo = &bufferInfo;
 
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = cameraDescriptorSet;
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.descriptorCount = 1;
-		descriptorWrite.pBufferInfo = &bufferInfo;
+		// Font image and sampler
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView = font->GetFontImageView();
+		imageInfo.sampler = font->GetFontSampler();
 
-		vkUpdateDescriptorSets(device.device(), 1, &descriptorWrite, 0, nullptr);
+		VkWriteDescriptorSet descriptorWriteImage{};
+		descriptorWriteImage.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWriteImage.dstSet = cameraDescriptorSet;
+		descriptorWriteImage.dstBinding = 1;
+		descriptorWriteImage.dstArrayElement = 0;
+		descriptorWriteImage.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWriteImage.descriptorCount = 1;
+		descriptorWriteImage.pImageInfo = &imageInfo;
+
+		std::array<VkWriteDescriptorSet, 2> descriptorWrites = { descriptorWriteUBO, descriptorWriteImage };
+		vkUpdateDescriptorSets(device.device(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 	}
 }
 
+// TODO: Game over logic.
+// TODO: Reset blocks after all cleared.
+// TODO: Increase ball speed by score.
+// TODO: Sound FX & Music
+// TODO: Block destroyed into pieces animation
 // TODO: Make debug render things transparent

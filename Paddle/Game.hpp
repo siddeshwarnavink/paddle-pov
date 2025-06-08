@@ -1,3 +1,5 @@
+#pragma once
+
 #include "VkWindow.hpp"
 #include "VkPipeline.hpp"
 #include "VkSwapChain.hpp"
@@ -6,6 +8,7 @@
 #include "GameCamera.hpp"
 #include "PlayerPaddle.hpp"
 #include "Wall.hpp"
+#include "GameFont.hpp"
 
 #include <memory>
 #include <vector>
@@ -36,6 +39,9 @@ namespace Paddle {
 		void CreateBall();
 		void CreatePaddle();
 		void CreateWalls();
+		void CreateFont();
+		void CreateFontPipelineLayout();
+		void CreateFontPipeline();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
@@ -54,6 +60,8 @@ namespace Paddle {
 		Vk::SwapChain swapChain{ device, window.getExtent() };
 		std::unique_ptr<Vk::Pipeline> pipeline;
 		VkPipelineLayout pipelineLayout;
+		std::unique_ptr<Vk::Pipeline> fontPipeline;
+		VkPipelineLayout fontPipelineLayout = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> commandBuffers;
 
 		VkBuffer vertexBuffer;
@@ -69,12 +77,15 @@ namespace Paddle {
 		VkDescriptorSet cameraDescriptorSet;
 
 		bool showDebug = false;
-
+		
+		std::vector<std::unique_ptr<GameEntity>> pendingDeleteEntities;
 		std::unique_ptr<GameEntity> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
-		//std::unique_ptr<Wall> backWallEntity;
 		std::vector<std::unique_ptr<GameEntity>> wallEntities;
 		std::vector<std::unique_ptr<GameEntity>> entities;
+		std::unique_ptr<GameFont> font;
 		GameCamera camera;
+	
+        int score;
 	};
 }
