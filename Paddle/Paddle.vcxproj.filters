@@ -66,6 +66,9 @@
     <ClCompile Include="GameFont.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GameSounds.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.hpp">
@@ -106,6 +109,9 @@
     </ClInclude>
     <ClInclude Include="Vendor\stb_truetype.h">
       <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="GameSounds.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

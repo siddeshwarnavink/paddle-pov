@@ -9,6 +9,7 @@
 #include "PlayerPaddle.hpp"
 #include "Wall.hpp"
 #include "GameFont.hpp"
+#include "GameSounds.hpp"
 
 #include <memory>
 #include <vector>
@@ -35,6 +36,7 @@ namespace Paddle {
 		void run();
 
 	private:
+		void CreateGameSounds();
 		void CreateBlocks();
 		void CreateBall();
 		void CreatePaddle();
@@ -77,6 +79,7 @@ namespace Paddle {
 		bool showDebug = false;
 		bool gameOver = false;
 
+		std::unique_ptr<GameSounds> gameSounds;
 		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
 		std::unique_ptr<GameEntity> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;

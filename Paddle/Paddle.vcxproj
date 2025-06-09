@@ -135,6 +135,7 @@
     <ClCompile Include="GameCamera.cpp" />
     <ClCompile Include="GameEntity.cpp" />
     <ClCompile Include="GameFont.cpp" />
+    <ClCompile Include="GameSounds.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PlayerPaddle.cpp" />
     <ClCompile Include="VkDevice.cpp" />
@@ -150,6 +151,7 @@
     <ClInclude Include="GameCamera.hpp" />
     <ClInclude Include="GameEntity.hpp" />
     <ClInclude Include="GameFont.hpp" />
+    <ClInclude Include="GameSounds.hpp" />
     <ClInclude Include="PlayerPaddle.hpp" />
     <ClInclude Include="Vendor\stb_truetype.h" />
     <ClInclude Include="VkDevice.hpp" />

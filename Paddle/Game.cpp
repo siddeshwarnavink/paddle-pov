@@ -17,12 +17,12 @@
 namespace Paddle
 {
 	Game::Game()
-		: window(WIDTH, HEIGHT, "Paddle Game"),
+		: window(WIDTH, HEIGHT, "Paddle POV"),
 		device(window),
 		swapChain(device, window.getExtent())
 	{
 		score = 0;
-
+		CreateGameSounds();
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
@@ -50,6 +50,11 @@ namespace Paddle
 			vkDestroyPipelineLayout(device.device(), fontPipelineLayout, nullptr);
 			fontPipelineLayout = VK_NULL_HANDLE;
 		}
+	}
+
+	void Game::CreateGameSounds() {
+		gameSounds = std::make_unique<GameSounds>();
+		gameSounds->PlayBgm();
 	}
 
 	void Game::CreateBall() {
@@ -180,8 +185,7 @@ namespace Paddle
 			// Update ball
 			//
 			if (!gameOver)
-				static_cast<Paddle::Ball*>(ballEntity.get())->Update();
-
+				static_cast<Paddle::Ball*>(ballEntity.get())->Update(score);
 			//
 			// Block Collision
 			//
@@ -216,6 +220,8 @@ namespace Paddle
 					ball->SetVelocity(vel);
 
 					(*it)->InitExplosion();
+					gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
+
 					score += 10;
 				}
 				else {
@@ -234,6 +240,7 @@ namespace Paddle
 				font->CreateVertexBuffer();
 				prevScore = score;
 				prevGameOver = gameOver;
+				gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 				continue;
 			}
 
@@ -255,6 +262,8 @@ namespace Paddle
 
 					vel = vel - 2.0f * glm::dot(vel, normal) * normal;
 					ball->SetVelocity(vel);
+
+					gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
 				}
 
 			}
@@ -288,6 +297,8 @@ namespace Paddle
 
 						vel = vel - 2.0f * glm::dot(vel, normal) * normal;
 						ball->SetVelocity(vel);
+
+						gameSounds->PlaySfx(SFX_WALL_BOUNCE);
 					}
 				}
 			}
@@ -321,6 +332,9 @@ namespace Paddle
 				// Game over keybindings
 				//
 				if (window.IsKeyPressed(GLFW_KEY_SPACE)) {
+					gameSounds->PlayBgm();
+					gameSounds->PlaySfx(SFX_BLOCKS_RESET);
+
 					ResetGame();
 					font->ClearText();
 					RenderScoreFont(scoreText);
@@ -337,6 +351,10 @@ namespace Paddle
 
 			if (prevScore != score || prevGameOver != gameOver) {
 				font->CreateVertexBuffer();
+				if (prevGameOver != gameOver) {
+					gameSounds->PauseBgm();
+					gameSounds->PlaySfx(SFX_GAME_OVER);
+				}
 			}
 			prevScore = score;
 			prevGameOver = gameOver;
@@ -515,10 +533,9 @@ namespace Paddle
 
 			pipeline->bind(commandBuffers[i]);
 
-			// Draw all blocks 
+			// Draw all blocks
 			for (auto& block : blocks)
 				block->DrawBlock(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
-
 
 			//
 			// Draw walls
@@ -542,17 +559,6 @@ namespace Paddle
 				ballEntity->Bind(commandBuffers[i]);
 				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
 				ballEntity->Draw(commandBuffers[i]);
-			}
-
-			//
-			// Draw the paddle
-			//
-			if (showDebug) {
-				glm::mat4 model = paddleEntity->GetModelMatrix();
-				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-				paddleEntity->Bind(commandBuffers[i]);
-				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
-				paddleEntity->Draw(commandBuffers[i]);
 			}
 
 			//
@@ -712,6 +718,11 @@ namespace Paddle
 	}
 }
 
-// TODO: Increase ball speed by score.
-// TODO: Sound FX & Music
-// TODO: Make debug render things transparent
+// TODO: Double, Triple score bonus.
+// TODO: Support full screen.
+// TODO: More complex block explosion animation (small cube break into sub-pieces, particle effect, ...)
+// TODO: Ball bounce particle effect.
+// TODO: Cook up something for background (day-night cycle maybe?)
+// TODO: Adding power-ups (extra life, paddle machine gun?)
+
+// BUG: Sometimes ball passing through paddle and getting disappeared

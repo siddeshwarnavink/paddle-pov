@@ -15,7 +15,7 @@ namespace Paddle {
 		CreateVertexBuffer();
 		CreateIndexBuffer();
 		velocity = glm::vec3(-1.0f, 0.5f, 0.0f);
-		radius = 0.25;		
+		radius = 0.25;
 	}
 
 	Ball::~Ball() {
@@ -30,10 +30,25 @@ namespace Paddle {
 		return radius;
 	}
 
-	void Ball::Update() {
+	void Ball::Update(int score) {
 		glm::vec3 pos = GetPosition();
-		pos += velocity * 0.04f; // TODO: Later move 0.01 as speed in Game class
-								 // and we can increase speed as game goes on.
+
+		float speedDelta = 0.02f;
+
+		if (score >= 20) {
+			speedDelta = 0.04f;
+		}
+		else if (score >= 50) {
+			speedDelta = 0.06f;
+		}
+		else if (score >= 100) {
+			speedDelta = 0.08f;
+		}
+		else if (score >= 200) {
+			speedDelta = 0.1f;
+		}
+
+		pos += velocity * speedDelta;
 		SetPosition(pos);
 	}
 

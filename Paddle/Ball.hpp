@@ -21,7 +21,7 @@ namespace Paddle {
 		void Draw(VkCommandBuffer commandBuffer) override;
 		uint32_t GetIndexCount() const;
 
-		void Update();
+		void Update(int score);
 		glm::vec3 GetVelocity();
 		void SetVelocity(glm::vec3 updatedVelocity);
 
