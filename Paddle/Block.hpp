@@ -7,6 +7,15 @@
 #include "GameEntity.hpp"
 
 namespace Paddle {
+	struct CubePiece {
+		glm::vec3 position;
+		glm::vec3 velocity;
+		glm::vec3 rotationAxis;
+		float rotationSpeed;
+		float currentAngle = 0.0f;
+		float scale = 1.0f;
+	};
+
 	class Block : public GameEntity {
 	public:
 		Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color);
@@ -19,7 +28,13 @@ namespace Paddle {
 		void CreateIndexBuffer();
 		void Bind(VkCommandBuffer commandBuffer) override;
 		void Draw(VkCommandBuffer commandBuffer) override;
+		void DrawBlock(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet);
 		uint32_t GetIndexCount() const;
+
+		void InitExplosion();
+		void Update();
+		bool IsExploded() { return isExploded; }
+		bool IsExplosionInitiated() const { return isExplosionInitiated; }
 
 	private:
 		Vk::Device& device;
@@ -34,5 +49,9 @@ namespace Paddle {
 
 		static const std::vector<Vertex> vertices;
 		static const std::vector<uint16_t> indices;
+
+		bool isExploded;
+		bool isExplosionInitiated;
+		std::vector<CubePiece> explodedPieces;
 	};
 }

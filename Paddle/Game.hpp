@@ -75,16 +75,16 @@ namespace Paddle {
 		VkDescriptorSet cameraDescriptorSet;
 
 		bool showDebug = false;
-		bool gameOver = false; 
-		
-		std::vector<std::unique_ptr<GameEntity>> pendingDeleteEntities;
+		bool gameOver = false;
+
+		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
 		std::unique_ptr<GameEntity> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
 		std::vector<std::unique_ptr<GameEntity>> wallEntities;
-		std::vector<std::unique_ptr<GameEntity>> entities;
+		std::vector<std::unique_ptr<Block>> blocks;
 		std::unique_ptr<GameFont> font;
 		GameCamera camera;
-	
-        int score;
+
+		int score;
 	};
 }
