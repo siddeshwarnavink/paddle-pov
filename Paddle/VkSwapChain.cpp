@@ -415,5 +415,53 @@ namespace Vk
             VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     }
 
+    void SwapChain::recreate() {
+        vkDeviceWaitIdle(device.device());
+
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device.device(), framebuffer, nullptr);
+        }
+        swapChainFramebuffers.clear();
+
+        for (auto imageView : swapChainImageViews) {
+            vkDestroyImageView(device.device(), imageView, nullptr);
+        }
+        swapChainImageViews.clear();
+
+        for (int i = 0; i < depthImages.size(); i++) {
+            vkDestroyImageView(device.device(), depthImageViews[i], nullptr);
+            vkDestroyImage(device.device(), depthImages[i], nullptr);
+            vkFreeMemory(device.device(), depthImageMemorys[i], nullptr);
+        }
+        depthImages.clear();
+        depthImageViews.clear();
+        depthImageMemorys.clear();
+
+        if (swapChain != nullptr) {
+            vkDestroySwapchainKHR(device.device(), swapChain, nullptr);
+            swapChain = nullptr;
+        }
+        vkDestroyRenderPass(device.device(), renderPass, nullptr);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (renderFinishedSemaphores.size() > i && renderFinishedSemaphores[i])
+                vkDestroySemaphore(device.device(), renderFinishedSemaphores[i], nullptr);
+            if (imageAvailableSemaphores.size() > i && imageAvailableSemaphores[i])
+                vkDestroySemaphore(device.device(), imageAvailableSemaphores[i], nullptr);
+            if (inFlightFences.size() > i && inFlightFences[i])
+                vkDestroyFence(device.device(), inFlightFences[i], nullptr);
+        }
+        renderFinishedSemaphores.clear();
+        imageAvailableSemaphores.clear();
+        inFlightFences.clear();
+        imagesInFlight.clear();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createDepthResources();
+        createFramebuffers();
+        createSyncObjects();
+    }
 }
 

@@ -20,11 +20,13 @@ namespace Vk
 			return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 		}
 		bool IsKeyPressed(int key) const;
+		GLFWwindow *GetWindow() { return window; }
+		void UpdateFramebufferSize();
 
 	private:
 		GLFWwindow* window;
-		const int width;
-		const int height;
+		int width;
+		int height;
 		std::string title;
 
 		void InitWindow();

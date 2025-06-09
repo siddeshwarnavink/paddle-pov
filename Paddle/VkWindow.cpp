@@ -32,4 +32,11 @@ namespace Vk {
 	bool Window::IsKeyPressed(int key) const {
 		return glfwGetKey(window, key) == GLFW_PRESS;
 	}
+
+	void Window::UpdateFramebufferSize() {
+		int currentWidth, currentHeight;
+		glfwGetFramebufferSize(window, &currentWidth, &currentHeight);
+		width = currentWidth;
+		height = currentHeight;
+	}
 }

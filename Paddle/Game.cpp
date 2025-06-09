@@ -16,12 +16,48 @@
 
 namespace Paddle
 {
+	constexpr int DESIGNED_WIDTH = 1920;
+	constexpr int DESIGNED_HEIGHT = 1080;
+	constexpr float DESIGNED_ASPECT = float(DESIGNED_WIDTH) / float(DESIGNED_HEIGHT);
+
+	void SetAspectViewport(VkCommandBuffer cmd, int fbWidth, int fbHeight) {
+		float fbAspect = float(fbWidth) / float(fbHeight);
+		int vpWidth, vpHeight, vpX, vpY;
+		if (fbAspect > DESIGNED_ASPECT) {
+			vpHeight = fbHeight;
+			vpWidth = int(DESIGNED_ASPECT * fbHeight);
+			vpX = (fbWidth - vpWidth) / 2;
+			vpY = 0;
+		} else {
+			vpWidth = fbWidth;
+			vpHeight = int(fbWidth / DESIGNED_ASPECT);
+			vpX = 0;
+			vpY = (fbHeight - vpHeight) / 2;
+		}
+
+		/*
+		std::cout << "vpWidth = " << vpWidth << std::endl;
+		std::cout << "vpHeight = " << vpHeight << std::endl;
+		std::cout << "vpX = " << vpX << std::endl;
+		std::cout << "vpY = " << vpY << std::endl;
+		*/
+
+		VkViewport viewport{};
+		viewport.x = float(vpX);
+		viewport.y = float(vpY);
+		viewport.width = float(vpWidth);
+		viewport.height = float(vpHeight);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		vkCmdSetViewport(cmd, 0, 1, &viewport);
+	}
+
 	Game::Game()
 		: window(WIDTH, HEIGHT, "Paddle POV"),
 		device(window),
 		swapChain(device, window.getExtent())
 	{
-		score = 0;
 		CreateGameSounds();
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
@@ -154,24 +190,78 @@ namespace Paddle
 	}
 
 	void Game::RenderScoreFont(std::string scoreText) {
-		font->AddText(scoreText, -(float)swapChain.width() / 2.0f + 10.0f, (float)swapChain.height() / 2.0f - 40.0f, 0.5f, glm::vec3(1.0f));
+		float width = static_cast<float>(swapChain.width());
+		float height = static_cast<float>(swapChain.height());
+
+		float paddingX = 20.0f;
+		float paddingY = isFullscreen ? 60.0f : 40.0f;
+
+		float x = (-width / 2.0f) + paddingX;
+		float y = (-height / 2.0f) + paddingY;
+
+		const float fontSize = isFullscreen ? 1.0f : 0.5f;
+
+		font->AddText(scoreText, x, y, fontSize, glm::vec3(1.0f));
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
-		float scaleX = (float)swapChain.width() / WIDTH;
-		float scaleY = (float)swapChain.height() / HEIGHT;
+		float width = static_cast<float>(swapChain.width());
+		float height = static_cast<float>(swapChain.height());
 
-		font->AddText("Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f, glm::vec3(1.0f, 0.2f, 0.2f));
-		font->AddText(scoreText, -80.0f * scaleX, 150.0f * scaleY, 0.75f, glm::vec3(1.0f));
+		float scaleX = width / 1080;
+		float scaleY = height / 720;
+
+		font->AddText("Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
+		font->AddText(scoreText, -80.0f * scaleX, 150.0f * scaleY, 0.75f * scaleX, glm::vec3(1.0f));
 	}
 
 	void Game::run() {
 		bool prevF12Pressed = false;
+		bool prevF10Pressed = false;
 		bool prevGameOver = false;
 		int prevScore = -1;
 
+		score = 0;
+		isFullscreen = true;
+
+		int windowedX = 100, windowedY = 100, windowedW = WIDTH, windowedH = HEIGHT;
+		GLFWwindow* glfwWin = window.GetWindow();
+		GLFWmonitor* mon = glfwGetPrimaryMonitor();
+		const GLFWvidmode* mode = glfwGetVideoMode(mon);
+
+		glfwSetWindowMonitor(glfwWin, mon, 0, 0, mode->width, mode->height, mode->refreshRate);
+		window.UpdateFramebufferSize();
+		swapChain.recreate();
+		CreatePipeline();
+		CreateFontPipeline();
+		CreateCommandBuffers();
+
 		while (!window.ShouldClose()) {
 			window.PollEvents();
+			//
+			// Fullscreen/windowed toggle
+			//
+			bool f10Pressed = window.IsKeyPressed(GLFW_KEY_F10);
+			if (f10Pressed && !prevF10Pressed) {
+				if (isFullscreen) {
+					windowedW = WIDTH;
+					windowedH = HEIGHT;
+					windowedX = 100;
+					windowedY = 100;
+					glfwSetWindowMonitor(glfwWin, nullptr, windowedX, windowedY, windowedW, windowedH, 0);
+					isFullscreen = false;
+				} else {
+					mon = glfwGetPrimaryMonitor();
+					mode = glfwGetVideoMode(mon);
+					glfwSetWindowMonitor(glfwWin, mon, 0, 0, mode->width, mode->height, mode->refreshRate);
+					isFullscreen = true;
+				}
+				window.UpdateFramebufferSize();
+				swapChain.recreate();
+				CreatePipeline();
+				CreateFontPipeline();
+				CreateCommandBuffers();
+			}
 
 			//
 			// Toggle debug
@@ -181,11 +271,9 @@ namespace Paddle
 				showDebug = !showDebug;
 			prevF12Pressed = f12Pressed;
 
-			//
-			// Update ball
-			//
 			if (!gameOver)
 				static_cast<Paddle::Ball*>(ballEntity.get())->Update(score);
+
 			//
 			// Block Collision
 			//
@@ -230,6 +318,7 @@ namespace Paddle
 			}
 
 			std::string scoreText = "Score: " + std::to_string(score);
+
 			//
 			// Reset Game
 			//
@@ -324,7 +413,6 @@ namespace Paddle
 			// Font rendering
 			//
 			font->ClearText();
-
 			if (gameOver) {
 				RenderGameOverFont(scoreText);
 
@@ -343,14 +431,12 @@ namespace Paddle
 					prevGameOver = gameOver;
 					continue;
 				}
-
-			}
-			else {
+			} else {
 				RenderScoreFont(scoreText);
 			}
+			font->CreateVertexBuffer();
 
-			if (prevScore != score || prevGameOver != gameOver) {
-				font->CreateVertexBuffer();
+			if (prevScore != score || prevGameOver != gameOver || prevF10Pressed != f10Pressed) {
 				if (prevGameOver != gameOver) {
 					gameSounds->PauseBgm();
 					gameSounds->PlaySfx(SFX_GAME_OVER);
@@ -358,6 +444,7 @@ namespace Paddle
 			}
 			prevScore = score;
 			prevGameOver = gameOver;
+			prevF10Pressed = f10Pressed;
 
 			CreateCommandBuffers();
 			DrawFrame();
@@ -531,6 +618,7 @@ namespace Paddle
 
 			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+			SetAspectViewport(commandBuffers[i], swapChain.width(), swapChain.height());
 			pipeline->bind(commandBuffers[i]);
 
 			// Draw all blocks
@@ -567,9 +655,14 @@ namespace Paddle
 			fontPipeline->bind(commandBuffers[i]);
 			font->Bind(commandBuffers[i]);
 			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+			// Use actual swapchain size for ortho
+			float orthoLeft = -static_cast<float>(swapChain.width()) / 2.0f;
+			float orthoRight = static_cast<float>(swapChain.width()) / 2.0f;
+			float orthoBottom = -static_cast<float>(swapChain.height()) / 2.0f;
+			float orthoTop = static_cast<float>(swapChain.height()) / 2.0f;
 			glm::mat4 ortho = glm::ortho(
-				-float(swapChain.width()) / 2.0f, float(swapChain.width()) / 2.0f,
-				-float(swapChain.height()) / 2.0f, float(swapChain.height()) / 2.0f,
+				orthoLeft, orthoRight,
+				orthoBottom, orthoTop,
 				-1.0f, 1.0f
 			);
 			vkCmdPushConstants(commandBuffers[i], fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &ortho);
@@ -616,7 +709,8 @@ namespace Paddle
 		glm::vec3 camPos = camera.GetPosition();
 		glm::vec3 camTarget = camera.GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
-		ubo.proj = glm::perspective(glm::radians(45.0f), swapChain.extentAspectRatio(), 0.1f, 10.0f);
+		float aspect = float(swapChain.width()) / float(swapChain.height());
+		ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;
 		void* data;
 		vkMapMemory(device.device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
@@ -719,7 +813,6 @@ namespace Paddle
 }
 
 // TODO: Double, Triple score bonus.
-// TODO: Support full screen.
 // TODO: More complex block explosion animation (small cube break into sub-pieces, particle effect, ...)
 // TODO: Ball bounce particle effect.
 // TODO: Cook up something for background (day-night cycle maybe?)

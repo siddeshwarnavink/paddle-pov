@@ -23,12 +23,12 @@ namespace Paddle {
 	};
 
 	class Game {
-	public:
-		static constexpr int WIDTH = 800;
-		static constexpr int HEIGHT = 600;
-
+	public:	
 		Game();
 		~Game();
+
+		static constexpr int WIDTH = 1080;
+		static constexpr int HEIGHT = 720;
 
 		Game(const Game&) = delete;
 		Game& operator=(const Game&) = delete;
@@ -61,6 +61,7 @@ namespace Paddle {
 		void RenderScoreFont(std::string scoreText);
 		void RenderGameOverFont(std::string scoreText);
 
+		bool isFullscreen;
 		Vk::Window window{ WIDTH, HEIGHT, "Paddle Game" };
 		Vk::Device device{ window };
 		Vk::SwapChain swapChain{ device, window.getExtent() };
@@ -77,7 +78,7 @@ namespace Paddle {
 		VkDescriptorSet cameraDescriptorSet;
 
 		bool showDebug = false;
-		bool gameOver = false;
+		bool gameOver = false; 
 
 		std::unique_ptr<GameSounds> gameSounds;
 		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;

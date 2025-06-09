@@ -34,6 +34,8 @@ namespace Vk {
 
         VkResult acquireNextImage(uint32_t* imageIndex);
         VkResult submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex);
+        void recreate();
+        void setWindowExtent(VkExtent2D extent) { windowExtent = extent; }
 
     private:
         void createSwapChain();
