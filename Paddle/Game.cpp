@@ -35,13 +35,6 @@ namespace Paddle
 			vpY = (fbHeight - vpHeight) / 2;
 		}
 
-		/*
-		std::cout << "vpWidth = " << vpWidth << std::endl;
-		std::cout << "vpHeight = " << vpHeight << std::endl;
-		std::cout << "vpX = " << vpX << std::endl;
-		std::cout << "vpY = " << vpY << std::endl;
-		*/
-
 		VkViewport viewport{};
 		viewport.x = float(vpX);
 		viewport.y = float(vpY);
@@ -272,7 +265,7 @@ namespace Paddle
 			prevF12Pressed = f12Pressed;
 
 			if (!gameOver)
-				static_cast<Paddle::Ball*>(ballEntity.get())->Update(score);
+				ballEntity->Update({ score });
 
 			//
 			// Block Collision
@@ -623,31 +616,19 @@ namespace Paddle
 
 			// Draw all blocks
 			for (auto& block : blocks)
-				block->DrawBlock(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
+				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			//
 			// Draw walls
 			//
-			if (showDebug) {
-				for (auto& entity : wallEntities) {
-					glm::mat4 model = entity->GetModelMatrix();
-					vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-					entity->Bind(commandBuffers[i]);
-					vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
-					entity->Draw(commandBuffers[i]);
-				}
-			}
+			if (showDebug)
+				for (auto& entity : wallEntities)
+					entity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			//
 			// Draw the ball
 			//
-			{
-				glm::mat4 model = ballEntity->GetModelMatrix();
-				vkCmdPushConstants(commandBuffers[i], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-				ballEntity->Bind(commandBuffers[i]);
-				vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
-				ballEntity->Draw(commandBuffers[i]);
-			}
+			ballEntity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			//
 			// Font rendering
