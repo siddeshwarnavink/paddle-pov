@@ -5,60 +5,94 @@
 #include "Vendor\stb_truetype.h"
 
 #include "VkDevice.hpp"
+#include "VkPipeline.hpp"
+#include "VkSwapChain.hpp"
 #include "GameEntity.hpp"
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+
 namespace Paddle {
+	enum class FontFamily {
+		FONT_FAMILY_TITLE = 0,
+		FONT_FAMILY_BODY,
+	};
+
+	struct FontFamilyHasher {
+		std::size_t operator()(const FontFamily& k) const noexcept {
+			return static_cast<std::size_t>(k);
+		}
+	};
+
+
+	struct FontFamilyData {
+		// --- Font metadata ---
+		std::string filePath;
+		stbtt_fontinfo fontInfo;
+		stbtt_bakedchar bakedChars[96];
+		unsigned char* bitmap = nullptr;
+		int fontAscent = 0;
+
+		// --- Vulkan resources for font image ---
+		VkImage fontImage = VK_NULL_HANDLE;
+		VkDeviceMemory fontImageMemory = VK_NULL_HANDLE;
+		VkImageView fontImageView = VK_NULL_HANDLE;
+		VkSampler fontSampler = VK_NULL_HANDLE;
+
+		// --- Vulkan buffer for GPU vertex data ---
+		VkBuffer vertexBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+
+		// --- CPU-side staging buffer for uploading data ---
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+
+		// --- Font rendering instance data ---
+		std::vector<Vertex> verticesInstance;
+
+		// -- Need to sort ---
+		VkDescriptorSet fontDescriptorSets;
+	};
+
+
 	class GameFont {
 	public:
-		GameFont(Vk::Device& device);
+		GameFont(Vk::Device& device, VkDescriptorPool& descriptorPool, VkDescriptorSetLayout& descriptorSetLayout, VkBuffer& cameraUbo, Vk::SwapChain& swapChain);
 		~GameFont();
 
 		GameFont(const GameFont&) = delete;
 		GameFont& operator=(const GameFont&) = delete;
 
-		void Bind(VkCommandBuffer commandBuffer);
 		void Draw(VkCommandBuffer commandBuffer);
 
-		void AddText(const std::string& text, float x, float y, float scale, glm::vec3 color);
-		void AddText(const std::string& text) {
-			AddText(text, 0.0f, 0.0f, 1.0f, glm::vec3(1.0f));
+		void AddText(FontFamily family, const std::string& text, float x, float y, float scale, glm::vec3 color);
+		void AddText(FontFamily family, const std::string& text) {
+			AddText(family, text, 0.0f, 0.0f, 1.0f, glm::vec3(1.0f));
 		}
 
-
 		void ClearText();
-		void SetText(const std::string& text, float x, float y, float scale, glm::vec3 color);
-		void CreateVertexBuffer();
+		void SetText(FontFamily family, const std::string& text, float x, float y, float scale, glm::vec3 color);
 
-		VkImageView GetFontImageView() const { return fontImageView; }
-		VkSampler GetFontSampler() const { return fontSampler; }
+		void CreateVertexBuffer();
+		void CreatePipeline();
 
 	private:
 		Vk::Device& device;
-		VkBuffer vertexBuffer;
-		VkDeviceMemory vertexBufferMemory;
-		VkDeviceMemory fontImageMemory;
-		VkImageView fontImageView;
-		VkSampler fontSampler;
-		uint32_t vertexCount;
-
-		std::vector<Vertex> verticesInstance;
+		VkDescriptorPool& descriptorPool;
+		VkDescriptorSetLayout& descriptorSetLayout;
+		VkBuffer& cameraUbo;
+		Vk::SwapChain& swapChain;
+		std::unique_ptr<Vk::Pipeline> fontPipeline;
+		VkPipelineLayout fontPipelineLayout = VK_NULL_HANDLE;
 
 		int texWidth, texHeight;
-		stbtt_bakedchar bakedChars[96]; // ASCII 32..126
-		GLuint fontTexture;
-		VkImage fontImage;
-		VkBuffer stagingBuffer;
-		VkDeviceMemory stagingBufferMemory;
+		std::unordered_map<FontFamily, std::string, FontFamilyHasher> fontFilePath;
+		std::unordered_map<FontFamily, FontFamilyData, FontFamilyHasher> fontsTable;
 
-		static const std::vector<Vertex> vertices;
-		static const std::vector<uint16_t> indices;
-
-		unsigned char* bitmap;
-
-		void CreateFont();
-		void CreateFontBuffer();
-
-		stbtt_fontinfo fontInfo;
-		int fontAscent = 0;
+		void CreateFonts();
+		void CreateFontBuffers();
+		void CreateDescriptorSet();
+		void CreateFontPipelineLayout();
 	};
 }

@@ -22,6 +22,7 @@ namespace Vk
 		bool IsKeyPressed(int key) const;
 		GLFWwindow *GetWindow() { return window; }
 		void UpdateFramebufferSize();
+		void Close() { glfwSetWindowShouldClose(window, true); }
 
 	private:
 		GLFWwindow* window;

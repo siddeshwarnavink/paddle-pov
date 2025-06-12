@@ -2,6 +2,11 @@
 #include <glm/glm.hpp>
 
 namespace Paddle {
+	struct CameraUbo {
+		glm::mat4 view;
+		glm::mat4 proj;
+	};
+
 	class GameCamera {
 	public:
 		GameCamera();

@@ -19,9 +19,6 @@
     <Filter Include="Header Files\vk">
       <UniqueIdentifier>{b0e7b394-fca1-4511-bf07-0da0cd4da007}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\shaders">
-      <UniqueIdentifier>{7795fd4b-de8c-4e07-a8e1-60bab6df88e3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Vendor">
       <UniqueIdentifier>{b6b312fd-df2a-410c-873f-de72cb578722}</UniqueIdentifier>
     </Filter>
@@ -117,12 +114,6 @@
   <ItemGroup>
     <None Include="compile_shaders.bat">
       <Filter>Source Files</Filter>
-    </None>
-    <None Include="shader.frag">
-      <Filter>Source Files\shaders</Filter>
-    </None>
-    <None Include="shader.vert">
-      <Filter>Source Files\shaders</Filter>
     </None>
   </ItemGroup>
 </Project>

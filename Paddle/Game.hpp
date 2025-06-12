@@ -17,13 +17,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace Paddle {
-	struct CameraUbo {
-		glm::mat4 view;
-		glm::mat4 proj;
-	};
-
 	class Game {
-	public:	
+	public:
 		Game();
 		~Game();
 
@@ -41,9 +36,7 @@ namespace Paddle {
 		void CreateBall();
 		void CreatePaddle();
 		void CreateWalls();
-		void CreateFont();
-		void CreateFontPipelineLayout();
-		void CreateFontPipeline();
+		void CreateGameFont();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
@@ -67,8 +60,6 @@ namespace Paddle {
 		Vk::SwapChain swapChain{ device, window.getExtent() };
 		std::unique_ptr<Vk::Pipeline> pipeline;
 		VkPipelineLayout pipelineLayout;
-		std::unique_ptr<Vk::Pipeline> fontPipeline;
-		VkPipelineLayout fontPipelineLayout = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> commandBuffers;
 
 		VkBuffer cameraUbo;
@@ -78,7 +69,7 @@ namespace Paddle {
 		VkDescriptorSet cameraDescriptorSet;
 
 		bool showDebug = false;
-		bool gameOver = false; 
+		bool gameOver = false;
 
 		std::unique_ptr<GameSounds> gameSounds;
 		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;

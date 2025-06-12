@@ -28,7 +28,8 @@ namespace Paddle
 			vpWidth = int(DESIGNED_ASPECT * fbHeight);
 			vpX = (fbWidth - vpWidth) / 2;
 			vpY = 0;
-		} else {
+		}
+		else {
 			vpWidth = fbWidth;
 			vpHeight = int(fbWidth / DESIGNED_ASPECT);
 			vpX = 0;
@@ -55,12 +56,10 @@ namespace Paddle
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
-		CreateFont();
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
-		CreateFontPipelineLayout();
-		CreateFontPipeline();
+		CreateGameFont();
 		CreateBlocks();
 		CreateBall();
 		CreatePaddle();
@@ -75,10 +74,6 @@ namespace Paddle
 		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
-		if (fontPipelineLayout != VK_NULL_HANDLE) {
-			vkDestroyPipelineLayout(device.device(), fontPipelineLayout, nullptr);
-			fontPipelineLayout = VK_NULL_HANDLE;
-		}
 	}
 
 	void Game::CreateGameSounds() {
@@ -135,10 +130,11 @@ namespace Paddle
 		wallEntities.emplace_back(std::move(frontWall));
 	}
 
-	void Game::CreateFont() {
-		font = std::make_unique<GameFont>(device);
-		font->AddText("Score: 0");
-		font->AddText("Game Over");
+	void Game::CreateGameFont() {
+		font = std::make_unique<GameFont>(device, descriptorPool, descriptorSetLayout, cameraUbo, swapChain);
+		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
+		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
+		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
 		font->CreateVertexBuffer();
 	}
 
@@ -194,7 +190,7 @@ namespace Paddle
 
 		const float fontSize = isFullscreen ? 1.0f : 0.5f;
 
-		font->AddText(scoreText, x, y, fontSize, glm::vec3(1.0f));
+		font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
@@ -204,8 +200,9 @@ namespace Paddle
 		float scaleX = width / 1080;
 		float scaleY = height / 720;
 
-		font->AddText("Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
-		font->AddText(scoreText, -80.0f * scaleX, 150.0f * scaleY, 0.75f * scaleX, glm::vec3(1.0f));
+		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
+		font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, -80.0f * scaleX, 50.0f * scaleY, 0.75f * scaleX, glm::vec3(1.0f));
+		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.", -153.0f * scaleX, 150.0f * scaleY, 0.25f * scaleX, glm::vec3(112.0f / 255.0f));
 	}
 
 	void Game::run() {
@@ -226,7 +223,7 @@ namespace Paddle
 		window.UpdateFramebufferSize();
 		swapChain.recreate();
 		CreatePipeline();
-		CreateFontPipeline();
+		font->CreatePipeline();
 		CreateCommandBuffers();
 
 		while (!window.ShouldClose()) {
@@ -243,7 +240,8 @@ namespace Paddle
 					windowedY = 100;
 					glfwSetWindowMonitor(glfwWin, nullptr, windowedX, windowedY, windowedW, windowedH, 0);
 					isFullscreen = false;
-				} else {
+				}
+				else {
 					mon = glfwGetPrimaryMonitor();
 					mode = glfwGetVideoMode(mon);
 					glfwSetWindowMonitor(glfwWin, mon, 0, 0, mode->width, mode->height, mode->refreshRate);
@@ -252,7 +250,7 @@ namespace Paddle
 				window.UpdateFramebufferSize();
 				swapChain.recreate();
 				CreatePipeline();
-				CreateFontPipeline();
+				font->CreatePipeline();
 				CreateCommandBuffers();
 			}
 
@@ -424,7 +422,11 @@ namespace Paddle
 					prevGameOver = gameOver;
 					continue;
 				}
-			} else {
+				else if (window.IsKeyPressed(GLFW_KEY_ESCAPE)) {
+					window.Close(); // TODO: Redirect to main menu once implemented.
+				}
+			}
+			else {
 				RenderScoreFont(scoreText);
 			}
 			font->CreateVertexBuffer();
@@ -466,23 +468,6 @@ namespace Paddle
 		}
 	}
 
-	void Game::CreateFontPipelineLayout() {
-		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		pushConstantRange.offset = 0;
-		pushConstantRange.size = sizeof(glm::mat4);
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 1;
-		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-		pipelineLayoutInfo.pushConstantRangeCount = 1;
-		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &fontPipelineLayout) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create font pipeline layout!");
-		}
-	}
-
-	// Vertex input binding and attribute descriptions for the pipeline
 	static VkVertexInputBindingDescription getBindingDescription() {
 		VkVertexInputBindingDescription bindingDescription{};
 		bindingDescription.binding = 0;
@@ -520,7 +505,7 @@ namespace Paddle
 		auto pipelineConfig = Vk::Pipeline::DefaultPipelineConfigInfo(swapChain.width(), swapChain.height());
 		pipelineConfig.renderPass = swapChain.getRenderPass();
 		pipelineConfig.pipelineLayout = pipelineLayout;
-		// Set up vertex input
+
 		static auto bindingDescription = getBindingDescription();
 		static auto attributeDescriptions = getAttributeDescriptions();
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -532,40 +517,8 @@ namespace Paddle
 		pipelineConfig.vertexInputInfo = vertexInputInfo;
 		pipeline = std::make_unique<Vk::Pipeline>(
 			device,
-			"shader.vert.spv",
-			"shader.frag.spv",
-			pipelineConfig);
-	}
-
-	void Game::CreateFontPipeline() {
-		auto pipelineConfig = Vk::Pipeline::DefaultPipelineConfigInfo(swapChain.width(), swapChain.height());
-		pipelineConfig.renderPass = swapChain.getRenderPass();
-		pipelineConfig.pipelineLayout = fontPipelineLayout;
-		// Set up vertex input
-		static auto bindingDescription = getBindingDescription();
-		static auto attributeDescriptions = getAttributeDescriptions();
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexInputInfo.vertexBindingDescriptionCount = 1;
-		vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-		pipelineConfig.vertexInputInfo = vertexInputInfo;
-		// Disable depth test/write for font
-		pipelineConfig.depthStencilInfo.depthTestEnable = VK_FALSE;
-		pipelineConfig.depthStencilInfo.depthWriteEnable = VK_FALSE;
-		// Enable alpha blending for font
-		pipelineConfig.colorBlendAttachment.blendEnable = VK_TRUE;
-		pipelineConfig.colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		pipelineConfig.colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		pipelineConfig.colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-		pipelineConfig.colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		pipelineConfig.colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		pipelineConfig.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-		fontPipeline = std::make_unique<Vk::Pipeline>(
-			device,
-			"font.vert.spv",
-			"font.frag.spv",
+			"Shader\\shader.vert.spv",
+			"Shader\\shader.frag.spv",
 			pipelineConfig);
 	}
 
@@ -633,20 +586,6 @@ namespace Paddle
 			//
 			// Font rendering
 			//
-			fontPipeline->bind(commandBuffers[i]);
-			font->Bind(commandBuffers[i]);
-			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
-			// Use actual swapchain size for ortho
-			float orthoLeft = -static_cast<float>(swapChain.width()) / 2.0f;
-			float orthoRight = static_cast<float>(swapChain.width()) / 2.0f;
-			float orthoBottom = -static_cast<float>(swapChain.height()) / 2.0f;
-			float orthoTop = static_cast<float>(swapChain.height()) / 2.0f;
-			glm::mat4 ortho = glm::ortho(
-				orthoLeft, orthoRight,
-				orthoBottom, orthoTop,
-				-1.0f, 1.0f
-			);
-			vkCmdPushConstants(commandBuffers[i], fontPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &ortho);
 			font->Draw(commandBuffers[i]);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
@@ -673,13 +612,15 @@ namespace Paddle
 		//
 		// Create UBO for camera
 		//
-		VkDeviceSize bufferSize = sizeof(CameraUbo);
-		device.createBuffer(
-			bufferSize,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			cameraUbo,
-			cameraUboMemory);
+		{
+			VkDeviceSize bufferSize = sizeof(CameraUbo);
+			device.createBuffer(
+				bufferSize,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				cameraUbo,
+				cameraUboMemory);
+		}
 	}
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
@@ -697,6 +638,37 @@ namespace Paddle
 		vkMapMemory(device.device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
 		memcpy(data, &ubo, sizeof(ubo));
 		vkUnmapMemory(device.device(), cameraUboMemory);
+	}
+
+	void Game::CreateDescriptorSet() {
+		//
+		// Camera UBO descriptor set
+		//
+		VkDescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = descriptorPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = &descriptorSetLayout;
+
+		if (vkAllocateDescriptorSets(device.device(), &allocInfo, &cameraDescriptorSet) != VK_SUCCESS) {
+			throw std::runtime_error("failed to allocate camera descriptor set!");
+		}
+
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = cameraUbo;
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(CameraUbo);
+
+		VkWriteDescriptorSet descriptorWriteUBO{};
+		descriptorWriteUBO.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWriteUBO.dstSet = cameraDescriptorSet;
+		descriptorWriteUBO.dstBinding = 0;
+		descriptorWriteUBO.dstArrayElement = 0;
+		descriptorWriteUBO.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWriteUBO.descriptorCount = 1;
+		descriptorWriteUBO.pBufferInfo = &bufferInfo;
+
+		vkUpdateDescriptorSets(device.device(), 1, &descriptorWriteUBO, 0, nullptr);
 	}
 
 	void Game::CreateDescriptorSetLayout() {
@@ -728,75 +700,33 @@ namespace Paddle
 	}
 
 	void Game::CreateDescriptorPool() {
+		const size_t numFonts = 2; // TODO: Need to find better way to get this count.
+		const size_t numSets = 1 + numFonts;
+
 		std::array<VkDescriptorPoolSize, 2> poolSizes{};
 		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSizes[0].descriptorCount = 1;
+		poolSizes[0].descriptorCount = static_cast<uint32_t>(numSets);
 		poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSizes[1].descriptorCount = 1;
+		poolSizes[1].descriptorCount = static_cast<uint32_t>(numSets);
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 		poolInfo.pPoolSizes = poolSizes.data();
-		poolInfo.maxSets = 1;
+		poolInfo.maxSets = static_cast<uint32_t>(numSets);
 
 		if (vkCreateDescriptorPool(device.device(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create descriptor pool!");
+			throw std::runtime_error("failed to create descriptor pool");
 		}
-	}
-
-	void Game::CreateDescriptorSet() {
-		//
-		// Create descriptor set for camera and font sampler
-		//
-		VkDescriptorSetAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorPool = descriptorPool;
-		allocInfo.descriptorSetCount = 1;
-		allocInfo.pSetLayouts = &descriptorSetLayout;
-
-		if (vkAllocateDescriptorSets(device.device(), &allocInfo, &cameraDescriptorSet) != VK_SUCCESS) {
-			throw std::runtime_error("failed to allocate descriptor set!");
-		}
-
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = cameraUbo;
-		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(CameraUbo);
-
-		VkWriteDescriptorSet descriptorWriteUBO{};
-		descriptorWriteUBO.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWriteUBO.dstSet = cameraDescriptorSet;
-		descriptorWriteUBO.dstBinding = 0;
-		descriptorWriteUBO.dstArrayElement = 0;
-		descriptorWriteUBO.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWriteUBO.descriptorCount = 1;
-		descriptorWriteUBO.pBufferInfo = &bufferInfo;
-
-		// Font image and sampler
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = font->GetFontImageView();
-		imageInfo.sampler = font->GetFontSampler();
-
-		VkWriteDescriptorSet descriptorWriteImage{};
-		descriptorWriteImage.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWriteImage.dstSet = cameraDescriptorSet;
-		descriptorWriteImage.dstBinding = 1;
-		descriptorWriteImage.dstArrayElement = 0;
-		descriptorWriteImage.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWriteImage.descriptorCount = 1;
-		descriptorWriteImage.pImageInfo = &imageInfo;
-
-		std::array<VkWriteDescriptorSet, 2> descriptorWrites = { descriptorWriteUBO, descriptorWriteImage };
-		vkUpdateDescriptorSets(device.device(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 	}
 }
 
+// TODO: Restrict paddle movement.
 // TODO: Double, Triple score bonus.
 // TODO: More complex block explosion animation (small cube break into sub-pieces, particle effect, ...)
 // TODO: Ball bounce particle effect.
 // TODO: Cook up something for background (day-night cycle maybe?)
 // TODO: Adding power-ups (extra life, paddle machine gun?)
+// TODO: Blinking font effect support.
 
 // BUG: Sometimes ball passing through paddle and getting disappeared
