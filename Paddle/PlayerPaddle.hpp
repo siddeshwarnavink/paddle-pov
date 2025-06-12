@@ -7,11 +7,15 @@
 #include "GameEntity.hpp"
 
 namespace Paddle {
-	class PlayerPaddle : public GameEntity {
+	class PlayerPaddle : public GameEntity, public IBounded {
 	public:
 		PlayerPaddle(Vk::Device& device, float x, float y, float z);
 
+
 		PlayerPaddle(const PlayerPaddle&) = delete;
 		PlayerPaddle& operator=(const PlayerPaddle&) = delete;
+
+		bool CheckCollision(GameEntity* other) override;
+		glm::vec3 GetHalfExtents() const override;
 	};
 }

@@ -50,7 +50,7 @@ namespace Paddle {
 		void UpdateUniformBuffer(uint32_t currentImage);
 		void UpdateAllEntitiesPosition(const glm::vec3& delta);
 		void ResetGame();
-		void ResetBlocks();
+		void ResetEntities();
 		void RenderScoreFont(std::string scoreText);
 		void RenderGameOverFont(std::string scoreText);
 
@@ -68,7 +68,6 @@ namespace Paddle {
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet cameraDescriptorSet;
 
-		bool showDebug = false;
 		bool gameOver = false;
 
 		std::unique_ptr<GameSounds> gameSounds;

@@ -12,6 +12,7 @@ namespace Paddle {
 		GameCamera();
 		void MoveLeft(float amount);
 		void MoveRight(float amount);
+		void SetPosition(const glm::vec3& pos) { position = pos; }
 		glm::vec3 GetPosition() const;
 		glm::vec3 GetTarget() const;
 	private:

@@ -73,6 +73,10 @@ namespace Paddle {
 		}
 	}
 
+	glm::vec3 Block::GetHalfExtents() const {
+		return glm::vec3(0.25f);
+	}
+
 	void Block::Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) {
 		if (isExplosionInitiated) {
 			for (const auto& piece : explodedPieces) {

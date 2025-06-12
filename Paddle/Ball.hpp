@@ -14,6 +14,8 @@ namespace Paddle {
 		Ball(const Ball&) = delete;
 		Ball& operator=(const Ball&) = delete;
 
+		bool CheckCollision(GameEntity* other) override;
+		void OnCollision(GameEntity* other);
 		void Update(UpdateArgs args = UpdateArgs{}) override;
 
 		glm::vec3 GetVelocity() { return velocity; }

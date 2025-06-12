@@ -1,7 +1,11 @@
 #include "Ball.hpp"
 #include "VkDevice.hpp"
-#include <cstring>
+
 #include <glm/gtc/constants.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
+
+#include <cstring>
 
 namespace Paddle {
 	const uint32_t slices = 64;
@@ -14,6 +18,35 @@ namespace Paddle {
 		SetPosition(glm::vec3(x, y, z));
 		SetVelocity(glm::vec3(-1.0f, 0.5f, 0.0f));
 		InitialiseEntity();
+	}
+
+	bool CheckAABBSphereCollision(const glm::vec3& boxMin, const glm::vec3& boxMax, const glm::vec3& sphereCenter, float sphereRadius) {
+		glm::vec3 closestPoint = glm::clamp(sphereCenter, boxMin, boxMax);
+		float distanceSquared = glm::distance2(closestPoint, sphereCenter);
+		return distanceSquared < (sphereRadius * sphereRadius);
+	}
+
+	bool Ball::CheckCollision(GameEntity* other) {
+		if (auto* boundedEntity = dynamic_cast<IBounded*>(other)) {
+			auto* entity = dynamic_cast<GameEntity*>(other);
+			glm::vec3 blockMin = entity->GetPosition() - boundedEntity->GetHalfExtents();
+			glm::vec3 blockMax = entity->GetPosition() + boundedEntity->GetHalfExtents();
+			return CheckAABBSphereCollision(blockMin, blockMax, this->GetPosition(), this->GetRadius());
+		}
+		return false;
+	}
+
+	void Ball::OnCollision(GameEntity* other) {
+		if (auto* boundedEntity = dynamic_cast<IBounded*>(other)) {
+			auto* entity = dynamic_cast<GameEntity*>(other);
+			glm::vec3 blockMin = entity->GetPosition() - boundedEntity->GetHalfExtents();
+			glm::vec3 blockMax = entity->GetPosition() + boundedEntity->GetHalfExtents();
+			glm::vec3 sphereCenter = this->GetPosition();
+			float sphereRadius = this->GetRadius();
+			glm::vec3 closestPoint = glm::clamp(sphereCenter, blockMin, blockMax);
+			glm::vec3 normal = glm::normalize(sphereCenter - closestPoint);
+			velocity = glm::reflect(velocity, normal);
+		}
 	}
 
 	void Ball::Update(UpdateArgs args) {

@@ -41,6 +41,7 @@ namespace Paddle {
 		VkSampler fontSampler = VK_NULL_HANDLE;
 
 		// --- Vulkan buffer for GPU vertex data ---
+		VkDescriptorSet fontDescriptorSets;
 		VkBuffer vertexBuffer = VK_NULL_HANDLE;
 		VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
 
@@ -50,9 +51,6 @@ namespace Paddle {
 
 		// --- Font rendering instance data ---
 		std::vector<Vertex> verticesInstance;
-
-		// -- Need to sort ---
-		VkDescriptorSet fontDescriptorSets;
 	};
 
 

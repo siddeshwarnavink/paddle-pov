@@ -37,8 +37,10 @@ namespace Paddle {
 		glm::vec3 GetPosition() const { return position; }
 		glm::vec3 GetRotation() const { return rotation; }
 
-		virtual void Update(UpdateArgs args = UpdateArgs{});
+		virtual void Update(UpdateArgs args = UpdateArgs{}) {}
 		virtual void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet);
+
+		virtual bool CheckCollision(GameEntity* other) { return false; }
 
 	protected:
 		Vk::Device& device;
@@ -57,5 +59,12 @@ namespace Paddle {
 	private:
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
+	};
+
+
+	class IBounded {
+	public:
+		virtual glm::vec3 GetHalfExtents() const = 0;
+		virtual ~IBounded() = default;
 	};
 }

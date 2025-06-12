@@ -105,8 +105,10 @@ namespace Paddle
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
 
-		for (int i = 0; i < 3; ++i) {
-			for (int j = 0; j < 8; ++j) {
+		//for (int i = 0; i < 3; ++i) {
+		for (int i = 0; i < 2; ++i) {
+			//for (int j = 0; j < 8; ++j) {
+			for (int j = 0; j < 2; ++j) {
 				float x = startX + i * spacing;
 				float y = startY + j * spacing;
 				glm::vec3 color = colors[dis(gen)];
@@ -116,17 +118,17 @@ namespace Paddle
 	}
 
 	void Game::CreateWalls() {
+		const float wallLength = 10.0f;
 		const float sideOffset = 3.0f;
 
-		auto leftWall = std::make_unique<Wall>(device, 6.0f, -sideOffset, 0.0f);
+		auto leftWall = std::make_unique<Wall>(device, 6.0f, -sideOffset, 0.0f, glm::vec3(wallLength, 1.0f, 0.1f));
 		wallEntities.emplace_back(std::move(leftWall));
 
-		auto rightWall = std::make_unique<Wall>(device, 6.0f, sideOffset + 2.0f, 0.0f);
+		auto rightWall = std::make_unique<Wall>(device, 6.0f, sideOffset + 2.0f, 0.0f, glm::vec3(wallLength, 1.0f, 0.1f));
 		wallEntities.emplace_back(std::move(rightWall));
 
 		// Wall behind all the blocks
-		auto frontWall = std::make_unique<Wall>(device, -4.0f, sideOffset, 0.0f);
-		frontWall->SetRotation(glm::vec3(0, 0, 30));
+		auto frontWall = std::make_unique<Wall>(device, -4.0f, sideOffset, 0.0f, glm::vec3(0.1f, wallLength, 1.0f));
 		wallEntities.emplace_back(std::move(frontWall));
 	}
 
@@ -136,12 +138,6 @@ namespace Paddle
 		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
 		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
 		font->CreateVertexBuffer();
-	}
-
-	bool CheckAABBSphereCollision(const glm::vec3& boxMin, const glm::vec3& boxMax, const glm::vec3& sphereCenter, float sphereRadius) {
-		glm::vec3 closestPoint = glm::clamp(sphereCenter, boxMin, boxMax);
-		float distanceSquared = glm::distance2(closestPoint, sphereCenter);
-		return distanceSquared < (sphereRadius * sphereRadius);
 	}
 
 	void Game::UpdateAllEntitiesPosition(const glm::vec3& delta) {
@@ -162,16 +158,25 @@ namespace Paddle
 	}
 
 	void Game::ResetGame() {
-		ResetBlocks();
-
-		paddleEntity->SetPosition(glm::vec3(5.5f, 0.0f, 0.0f));
-		ballEntity->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-
+		ResetEntities();
 		score = 0;
 		gameOver = false;
 	}
 
-	void Game::ResetBlocks() {
+	void Game::ResetEntities() {
+		camera.SetPosition(glm::vec3(6.0f, 0.0f, 0.0f));
+
+		paddleEntity->SetPosition(glm::vec3(5.5f, 0.0f, 0.0f));
+
+		//
+		// Rest ball
+		auto* ball = static_cast<Paddle::Ball*>(ballEntity.get());
+		ball->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
+		ball->SetVelocity(glm::vec3(-1.0f, 0.5f, 0.0f));
+
+		//
+		// Reset blocks
+		//
 		for (auto& block : blocks)
 			pendingDeleteBlocks.push_back(std::move(block));
 		blocks.clear();
@@ -210,6 +215,8 @@ namespace Paddle
 		bool prevF10Pressed = false;
 		bool prevGameOver = false;
 		int prevScore = -1;
+
+		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
 
 		score = 0;
 		isFullscreen = true;
@@ -255,12 +262,18 @@ namespace Paddle
 			}
 
 			//
-			// Toggle debug
+			// Reset blocks
 			//
-			bool f12Pressed = window.IsKeyPressed(GLFW_KEY_F12);
-			if (f12Pressed && !prevF12Pressed)
-				showDebug = !showDebug;
-			prevF12Pressed = f12Pressed;
+			if (blocks.empty()) {
+				ResetEntities();
+				gameSounds->PlaySfx(SFX_BLOCKS_RESET);
+			}
+
+			//
+			// Ball when behind paddle
+			//
+			if (ballEntity->GetPosition().x > 6.0f)
+				gameOver = true;
 
 			if (!gameOver)
 				ballEntity->Update({ score });
@@ -273,131 +286,73 @@ namespace Paddle
 			const float ballRadius = ball->GetRadius();
 			const glm::vec3 ballPos = ballEntity->GetPosition();
 
-			if (ballPos.x > 6.0f)
-				gameOver = true;
-
 			for (auto it = blocks.begin(); it != blocks.end(); ) {
-				(*it)->Update();
-				glm::vec3 blockPos = (*it)->GetPosition();
-				glm::vec3 blockMin = blockPos - glm::vec3(0.25f);
-				glm::vec3 blockMax = blockPos + glm::vec3(0.25f);
+				auto block = (*it).get();
 
-				if ((*it)->IsExploded()) {
+				block->Update();
+
+				if (block->IsExploded()) {
 					pendingDeleteBlocks.push_back(std::move(*it));
 					it = blocks.erase(it);
-					continue;
 				}
-				else if (!(*it)->IsExplosionInitiated() && CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
-					glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
-					glm::vec3 normal = glm::normalize(ballPos - closestPoint);
-
-					if (glm::length(normal) < 0.0001f) {
-						normal = glm::vec3(1, 0, 0);
-					}
-
-					vel = vel - 2.0f * glm::dot(vel, normal) * normal;
-					ball->SetVelocity(vel);
-
-					(*it)->InitExplosion();
+				else if (!block->IsExplosionInitiated() && ball->CheckCollision(block)) {
+					ball->OnCollision(block);
+					block->InitExplosion();
 					gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
-
+					
 					score += 10;
 				}
-				else {
-					++it;
-				}
+				else ++it;
 			}
+
 
 			std::string scoreText = "Score: " + std::to_string(score);
 
 			//
-			// Reset Game
-			//
-			if (window.IsKeyPressed(GLFW_KEY_F11)) {
-				ResetGame();
-				font->ClearText();
-				RenderScoreFont(scoreText);
-				font->CreateVertexBuffer();
-				prevScore = score;
-				prevGameOver = gameOver;
-				gameSounds->PlaySfx(SFX_BLOCKS_RESET);
-				continue;
-			}
-
-			//
 			// Paddle Collision
 			//
-			{
-				glm::vec3 blockPos = paddleEntity->GetPosition();
-				glm::vec3 blockMin = blockPos - glm::vec3(0.25f);
-				glm::vec3 blockMax = blockPos + glm::vec3(0.25f);
-
-				if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
-					glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
-					glm::vec3 normal = glm::normalize(ballPos - closestPoint);
-
-					if (glm::length(normal) < 0.0001f) {
-						normal = glm::vec3(1, 0, 0);
-					}
-
-					vel = vel - 2.0f * glm::dot(vel, normal) * normal;
-					ball->SetVelocity(vel);
-
-					gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
-				}
-
+			GameEntity* paddle = paddleEntity.get();
+			if (ball->CheckCollision(paddle)) {
+				ball->OnCollision(paddle);
+				gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
 			}
 
 			//
 			// Wall collision
 			//
-			{
-				for (size_t i = 0; i < wallEntities.size(); ++i) {
-					auto& entity = wallEntities[i];
-					glm::vec3 blockPos = entity->GetPosition();
+			for (size_t i = 0; i < wallEntities.size(); ++i) {
+				auto& entity = wallEntities[i];
 
-					glm::vec3 halfExtents;
-					const float wallLength = 10.0f;
-					if (i < 2) // Left & Right wall
-						halfExtents = glm::vec3(wallLength, 1.0f, 0.1f);
-					else // Front wall
-						halfExtents = glm::vec3(0.1f, wallLength, 1.0f);
-
-
-					glm::vec3 blockMin = blockPos - halfExtents;
-					glm::vec3 blockMax = blockPos + halfExtents;
-
-					if (CheckAABBSphereCollision(blockMin, blockMax, ballPos, ballRadius)) {
-						glm::vec3 closestPoint = glm::clamp(ballPos, blockMin, blockMax);
-						glm::vec3 normal = glm::normalize(ballPos - closestPoint);
-
-						if (glm::length(normal) < 0.0001f) {
-							normal = glm::vec3(1, 0, 0);
-						}
-
-						vel = vel - 2.0f * glm::dot(vel, normal) * normal;
-						ball->SetVelocity(vel);
-
-						gameSounds->PlaySfx(SFX_WALL_BOUNCE);
-					}
+				if (ball->CheckCollision(entity.get())) {
+					ball->OnCollision(entity.get());
+					gameSounds->PlaySfx(SFX_WALL_BOUNCE);
 				}
 			}
 
 			//
 			// Camera movement logic
 			//
-			if (!gameOver || showDebug) {
-				if (showDebug) {
-					if (window.IsKeyPressed(GLFW_KEY_UP) || window.IsKeyPressed(GLFW_KEY_W))
-						UpdateAllEntitiesPosition(glm::vec3(0.05f, 0.0f, 0.0f));
-					if (window.IsKeyPressed(GLFW_KEY_DOWN) || window.IsKeyPressed(GLFW_KEY_S))
-						UpdateAllEntitiesPosition(glm::vec3(-0.05f, 0.0f, 0.0f));
-				}
+			if (!gameOver) {
+				glm::vec3 paddleDelta = glm::vec3(0.0f);
 
 				if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
-					UpdateAllEntitiesPosition(glm::vec3(0.0f, 0.05f, 0.0f));
+					paddleDelta = glm::vec3(0.0f, 0.05f, 0.0f);
 				if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
-					UpdateAllEntitiesPosition(glm::vec3(0.0f, -0.05f, 0.0f));
+					paddleDelta = glm::vec3(0.0f, -0.05f, 0.0f);
+
+				if (paddleDelta != glm::vec3(0.0f)) {
+					UpdateAllEntitiesPosition(paddleDelta);
+
+					bool willCollide = false;
+					for (auto& entity : wallEntities) {
+						if (paddleEntity->CheckCollision(entity.get())) {
+							willCollide = true;
+							break;
+						}
+					}
+
+					if (willCollide) UpdateAllEntitiesPosition(-paddleDelta);
+				}
 			}
 
 			//
@@ -429,6 +384,7 @@ namespace Paddle
 			else {
 				RenderScoreFont(scoreText);
 			}
+
 			font->CreateVertexBuffer();
 
 			if (prevScore != score || prevGameOver != gameOver || prevF10Pressed != f10Pressed) {
@@ -443,9 +399,6 @@ namespace Paddle
 
 			CreateCommandBuffers();
 			DrawFrame();
-
-			if (blocks.empty())
-				ResetBlocks();
 		}
 		vkDeviceWaitIdle(device.device());
 		pendingDeleteBlocks.clear();
@@ -570,13 +523,6 @@ namespace Paddle
 			// Draw all blocks
 			for (auto& block : blocks)
 				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
-
-			//
-			// Draw walls
-			//
-			if (showDebug)
-				for (auto& entity : wallEntities)
-					entity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			//
 			// Draw the ball
@@ -721,7 +667,6 @@ namespace Paddle
 	}
 }
 
-// TODO: Restrict paddle movement.
 // TODO: Double, Triple score bonus.
 // TODO: More complex block explosion animation (small cube break into sub-pieces, particle effect, ...)
 // TODO: Ball bounce particle effect.

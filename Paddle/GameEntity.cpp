@@ -49,10 +49,6 @@ namespace Paddle {
 		vkUnmapMemory(device.device(), indexBufferMemory);
 	}
 
-	void GameEntity::Update(UpdateArgs args) {
-		// ...
-	}
-
 	void GameEntity::Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) {
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, position);

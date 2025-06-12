@@ -17,13 +17,14 @@ namespace Paddle {
 		float scale = 1.0f;
 	};
 
-	class Block : public GameEntity {
+	class Block : public GameEntity, public IBounded {
 	public:
 		Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color);
 
 		Block(const Block&) = delete;
 		Block& operator=(const Block&) = delete;
 
+		glm::vec3 GetHalfExtents() const override;
 		void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) override;
 		void Update(UpdateArgs args = UpdateArgs{}) override;
 
