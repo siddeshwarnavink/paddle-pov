@@ -51,6 +51,7 @@ namespace Paddle {
 	}
 
 	glm::vec3 PlayerPaddle::GetHalfExtents() const {
-		return glm::vec3(0.25);
+		//return glm::vec3(0.25);
+		return glm::vec3(0.001f, 0.25f, 0.075f);
 	}
 }

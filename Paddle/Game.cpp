@@ -8,17 +8,16 @@
 #include <stdexcept>
 #include <array>
 #include <ctime> 
+#include <cstdlib>
 
 namespace Paddle
 {
-	static constexpr int WIDTH = 1080;
+	static constexpr int WIDTH  = 1080;
 	static constexpr int HEIGHT = 720;
 
 	static constexpr float PADDLE_SPEED = 0.05f;
 
-	static constexpr float BLOCK_SPACING = 0.65f;
-
-	static constexpr float WALL_LENGTH = 10.0f;
+	static constexpr float WALL_LENGTH      = 10.0f;
 	static constexpr float WALL_SIDE_OFFSET = 3.0f;
 
 	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV"),
@@ -52,8 +51,7 @@ namespace Paddle
 	}
 
 	void Game::CreateGameEntities() {
-		CreateBlocks();
-
+		Block::CreateBlocks(device, blocks);
 		ballEntity = std::make_unique<Ball>(device);
 		paddleEntity = std::make_unique<PlayerPaddle>(device);
 
@@ -72,32 +70,6 @@ namespace Paddle
 			wallEntities.emplace_back(std::move(frontWall));
 		}
 
-	}
-
-
-	void Game::CreateBlocks() {
-		const float startX = -BLOCK_SPACING * 2;
-		const float startY = -BLOCK_SPACING * 2;
-
-		const std::vector<glm::vec3> colors = {
-			{124.0f / 255.0f, 156.0f / 255.0f, 228.0f / 255.0f}, // #7c9ce4
-			{100.0f / 255.0f, 230.0f / 255.0f, 215.0f / 255.0f}, // #64e6d7
-			{231.0f / 255.0f, 235.0f / 255.0f, 185.0f / 255.0f}, // #e7ebb9
-			{179.0f / 255.0f, 240.0f / 255.0f, 255.0f / 255.0f}, // #b3f0ff
-			{30.0f / 255.0f, 151.0f / 255.0f, 158.0f / 255.0f},  // #1e979e
-		};
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
-
-		for (int i = 0; i < 3; ++i) {
-			for (int j = 0; j < 8; ++j) {
-				float x = startX + i * BLOCK_SPACING;
-				float y = startY + j * BLOCK_SPACING;
-				glm::vec3 color = colors[dis(gen)];
-				blocks.emplace_back(std::make_unique<Block>(device, x, y, 0.0f, color));
-			}
-		}
 	}
 
 	void Game::CreateGameFont() {
@@ -136,11 +108,11 @@ namespace Paddle
 		camera->Reset();
 		paddleEntity->Reset();
 		ballEntity->Reset();
+		for(auto& wall : wallEntities) wall->Reset();
 
-		for (auto& block : blocks)
-			pendingDeleteBlocks.push_back(std::move(block));
 		blocks.clear();
-		CreateBlocks();
+		pendingDeleteBlocks.clear();
+		Block::CreateBlocks(device, blocks);
 	}
 
 	void Game::RenderScoreFont(std::string scoreText, std::string bonusText) {
@@ -179,11 +151,17 @@ namespace Paddle
 	}
 
 	void Game::run() {
+		srand(static_cast<unsigned int>(time(0)));
+
+		bool prevPlayPaddleCollisionSound = false;
 		bool prevF10Pressed = false;
 		bool prevGameOver = false;
 		int prevScore = -1;
 		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
 		score = 0;
+
+		bool waitingForBlockReset = false;
+		time_t blockResetTime = 0;
 
 		time_t lastCollision = time(NULL);
 		time_t lastBonusMessage = time(NULL);
@@ -209,16 +187,15 @@ namespace Paddle
 				CreateCommandBuffers();
 			}
 
+			if (waitingForBlockReset) {
+				if (difftime(time(NULL), blockResetTime) >= 1) { 
+					ResetEntities();
+					waitingForBlockReset = false;
+				}
+			}
+
 			if (difftime(time(NULL), lastBonusMessage) > 3)
 				bonusText = "";
-
-			//
-			// Reset blocks
-			//
-			if (blocks.empty()) {
-				ResetEntities();
-				gameSounds->PlaySfx(SFX_BLOCKS_RESET);
-			}
 
 			//
 			// Ball when behind paddle
@@ -242,6 +219,15 @@ namespace Paddle
 				if (block->IsExploded()) {
 					pendingDeleteBlocks.push_back(std::move(*it));
 					it = blocks.erase(it);
+
+					//
+					// Reset blocks
+					//
+					if (blocks.empty() && !waitingForBlockReset) {
+						waitingForBlockReset = true;
+						blockResetTime = time(NULL);
+						gameSounds->PlaySfx(SFX_BLOCKS_RESET);
+					}
 				}
 				else if (!block->IsExplosionInitiated() && ballEntity->CheckCollision(block)) {
 					didBlockCollide = true;
@@ -278,9 +264,14 @@ namespace Paddle
 			// Paddle Collision
 			//
 			GameEntity* paddle = paddleEntity.get();
+			bool playPaddleCollisionSound = false;
+
 			if (ballEntity->CheckCollision(paddle)) {
 				ballEntity->OnCollision(paddle);
-				gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
+
+				if(!prevPlayPaddleCollisionSound)
+					gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
+				playPaddleCollisionSound = true;
 			}
 
 			//
@@ -362,6 +353,7 @@ namespace Paddle
 			prevScore = score;
 			prevGameOver = gameOver;
 			prevF10Pressed = f10Pressed;
+			prevPlayPaddleCollisionSound = playPaddleCollisionSound;
 
 			CreateCommandBuffers();
 			DrawFrame();
@@ -615,5 +607,3 @@ namespace Paddle
 // TODO: Cook up something for background (day-night cycle maybe?)
 // TODO: Adding power-ups (extra life, paddle machine gun?)
 // TODO: Blinking font effect support.
-
-// BUG: Sometimes ball passing through paddle and getting disappeared

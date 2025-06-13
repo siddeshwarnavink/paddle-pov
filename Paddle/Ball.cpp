@@ -51,8 +51,24 @@ namespace Paddle {
 			glm::vec3 sphereCenter = this->GetPosition();
 			float sphereRadius = this->GetRadius();
 			glm::vec3 closestPoint = glm::clamp(sphereCenter, blockMin, blockMax);
-			glm::vec3 normal = glm::normalize(sphereCenter - closestPoint);
+			glm::vec3 normal = sphereCenter - closestPoint;
+
+			// Ball center is inside the box, so pick the axis of minimum penetration
+			if (glm::length2(normal) < 1e-6f) {
+				glm::vec3 distances = glm::min(blockMax - sphereCenter, sphereCenter - blockMin);
+				int axis = 0;
+				if (distances.y < distances.x) axis = 1;
+				if (distances.z < distances[axis]) axis = 2;
+				normal = glm::vec3(0.0f);
+				normal[axis] = (sphereCenter[axis] > (blockMin[axis] + blockMax[axis]) * 0.5f) ? 1.0f : -1.0f;
+			} else {
+				normal = glm::normalize(normal);
+			}
+
 			velocity = glm::reflect(velocity, normal);
+
+			// Push ball out of the paddle to prevent sticking
+			SetPosition(closestPoint + normal * (sphereRadius + 1e-3f));
 		}
 	}
 

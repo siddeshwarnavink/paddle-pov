@@ -25,11 +25,16 @@ namespace Paddle {
 			3, 2, 6, 6, 7, 3,  // Top face
 			4, 5, 1, 1, 0, 4   // Bottom face
 		};
-		SetPosition(glm::vec3(x, y, z));
+		initPosition = glm::vec3(x, y, z);
+		SetPosition(initPosition);
 		InitialiseEntity();
 	}
 
 	glm::vec3 Wall::GetHalfExtents() const {
 		return halfExtents;
+	}
+
+	void Wall::Reset() {
+		SetPosition(initPosition);
 	}
 }

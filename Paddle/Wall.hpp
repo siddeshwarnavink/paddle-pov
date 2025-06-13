@@ -16,7 +16,10 @@ namespace Paddle {
 
 		glm::vec3 GetHalfExtents() const override;
 
+		void Reset();
+
 	private:
+		glm::vec3 initPosition;
 		glm::vec3 halfExtents;
 	};
 }

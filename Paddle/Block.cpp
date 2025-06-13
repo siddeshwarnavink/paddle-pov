@@ -3,11 +3,20 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/random.hpp>
+#include <glm/gtc/epsilon.hpp>
 
 #include <cstring>
+#include <random>
 
 namespace Paddle {
+	static constexpr float BLOCK_SPACING = 0.65f;
+
+	static constexpr float TNT_PROB     = 0.2f;
+	static constexpr float RAINBOW_PROB = 0.05f;
+
 	Block::Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color) : GameEntity(device) {
+		allBlocksRef = nullptr;
+
 		verticesInstance = {
 			// Front face
 			{{-0.25f, -0.25f,  0.25f}, {0,0,0}, {0,0,1}, {0,0}},
@@ -28,7 +37,26 @@ namespace Paddle {
 			3, 2, 6, 6, 7, 3,  // Top face
 			4, 5, 1, 1, 0, 4   // Bottom face
 		};
-		for (auto& v : verticesInstance) v.color = color;
+
+		glm::vec3 applyColor = color;
+
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::bernoulli_distribution tnt_dis(TNT_PROB);
+		std::bernoulli_distribution rainbow_dis(RAINBOW_PROB);
+
+		isTNTBlock = tnt_dis(gen);
+		if(isTNTBlock)
+			applyColor = glm::vec3(0.0f);
+
+		isRainbowBlock = rainbow_dis(gen);
+		if (isRainbowBlock) {
+			applyColor = glm::vec3(1.0f, 0.0f, 1.0f);
+			isTNTBlock = false;
+		}
+
+		for (auto& v : verticesInstance) v.color = applyColor;
+
 		SetPosition(glm::vec3(x, y, z));
 		InitialiseEntity();
 
@@ -36,10 +64,73 @@ namespace Paddle {
 		isExplosionInitiated = false;
 	}
 
+	void Block::CreateBlocks(Vk::Device& device, std::vector<std::unique_ptr<Block>>& blocks) {
+		const float startX = -BLOCK_SPACING * 2;
+		const float startY = -BLOCK_SPACING * 2;
+
+		const std::vector<glm::vec3> colors = {
+			{124.0f / 255.0f, 156.0f / 255.0f, 228.0f / 255.0f}, // #7c9ce4
+			{100.0f / 255.0f, 230.0f / 255.0f, 215.0f / 255.0f}, // #64e6d7
+			{231.0f / 255.0f, 235.0f / 255.0f, 185.0f / 255.0f}, // #e7ebb9
+			{179.0f / 255.0f, 240.0f / 255.0f, 255.0f / 255.0f}, // #b3f0ff
+			{30.0f / 255.0f, 151.0f / 255.0f, 158.0f / 255.0f},  // #1e979e
+		};
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
+
+		for (int i = 0; i < 3; ++i) {
+			for (int j = 0; j < 8; ++j) {
+				float x = startX + i * BLOCK_SPACING;
+				float y = startY + j * BLOCK_SPACING;
+				glm::vec3 color = colors[dis(gen)];
+				blocks.emplace_back(std::make_unique<Block>(device, x, y, 0.0f, color));
+			}
+		}
+
+		for (auto& block : blocks) block->SetAllBlocksRef(&blocks);
+
+	}
+
 	void Block::InitExplosion() {
 		if (isExplosionInitiated) return;
-		explodedPieces.clear();
 		isExplosionInitiated = true;
+		explodedPieces.clear();
+
+		//
+		// TNT Block
+		//
+		if (isTNTBlock && allBlocksRef) {
+			for (auto& otherBlockPtr : *allBlocksRef) {
+				if (!otherBlockPtr || otherBlockPtr.get() == this) continue;
+
+				glm::vec3 otherPos = otherBlockPtr->GetPosition();
+				glm::vec3 thisPos = this->GetPosition();
+
+				glm::vec3 diff = glm::abs(otherPos - thisPos);
+
+				int adjacentAxes = 0;
+				int sameAxes = 0;
+				for (int i = 0; i < 3; ++i) {
+					if (glm::epsilonEqual(diff[i], BLOCK_SPACING, 0.01f)) adjacentAxes++;
+					else if (glm::epsilonEqual(diff[i], 0.0f, 0.01f)) sameAxes++;
+				}
+
+				if (adjacentAxes == 1 && sameAxes == 2) {
+					otherBlockPtr->InitExplosion();
+				}
+			}
+		}
+
+		//
+		// Rainbow block
+		//
+		if (isRainbowBlock && allBlocksRef) {
+			for (auto& otherBlockPtr : *allBlocksRef) {
+				if (!otherBlockPtr || otherBlockPtr.get() == this) continue;
+				otherBlockPtr->InitExplosion();
+			}
+		}
 
 		for (int x = -1; x <= 1; x += 2) {
 			for (int y = -1; y <= 1; y += 2) {
@@ -98,7 +189,7 @@ namespace Paddle {
 
 		if (allGone) {
 			isExploded = true;
-		}	
+		}
 	}
 
 	glm::vec3 Block::GetHalfExtents() const {
@@ -127,7 +218,7 @@ namespace Paddle {
 				vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 				vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-				vkCmdDrawIndexed(commandBuffer, indicesInstance.size(), 1, 0, 0, 0);
+				vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indicesInstance.size()), 1, 0, 0, 0);
 			}
 		}
 		else {
@@ -151,7 +242,7 @@ namespace Paddle {
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 			vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-			vkCmdDrawIndexed(commandBuffer, indicesInstance.size(), 1, 0, 0, 0);
+			vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indicesInstance.size()), 1, 0, 0, 0);
 		}
 	}
 }

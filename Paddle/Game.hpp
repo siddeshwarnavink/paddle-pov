@@ -32,7 +32,6 @@ namespace Paddle {
 		// === Initialization ===
 		void CreateGameSounds();
 		void CreateGameEntities();
-		void CreateBlocks();
 		void CreateGameFont();
 		void CreatePipelineLayout();
 		void CreatePipeline();
@@ -79,7 +78,7 @@ namespace Paddle {
 		std::unique_ptr<GameCamera> camera;
 		std::unique_ptr<Ball> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
-		std::vector<std::unique_ptr<GameEntity>> wallEntities;
+		std::vector<std::unique_ptr<Wall>> wallEntities;
 		std::vector<std::unique_ptr<Block>> blocks;
 		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
 	};

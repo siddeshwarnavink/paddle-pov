@@ -3,9 +3,11 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <memory>
 
 #include "VkDevice.hpp"
 #include "GameEntity.hpp"
+#include "Block.hpp"
 
 namespace Paddle {
 	struct CubePiece {
@@ -25,6 +27,9 @@ namespace Paddle {
 		Block(const Block&) = delete;
 		Block& operator=(const Block&) = delete;
 
+		void SetAllBlocksRef(std::vector<std::unique_ptr<Block>>* ref) { allBlocksRef = ref; } 
+		static void CreateBlocks(Vk::Device& device, std::vector<std::unique_ptr<Block>>& blocks);
+
 		glm::vec3 GetHalfExtents() const override;
 		void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) override;
 		void Update(UpdateArgs args = UpdateArgs{}) override;
@@ -34,6 +39,9 @@ namespace Paddle {
 		bool IsExplosionInitiated() const { return isExplosionInitiated; }
 
 	private:
+		std::vector<std::unique_ptr<Block>>* allBlocksRef = nullptr;
+		bool isTNTBlock;
+		bool isRainbowBlock;
 		bool isExploded;
 		bool isExplosionInitiated;
 		std::vector<CubePiece> explodedPieces;
