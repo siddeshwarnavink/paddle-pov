@@ -52,7 +52,7 @@ namespace Paddle {
 
 		// === Rendering ===
 		void DrawFrame();
-		void RenderScoreFont(std::string scoreText);
+		void RenderScoreFont(std::string scoreText, std::string bonusText);
 		void RenderGameOverFont(std::string scoreText);
 
 		// === Window & Vulkan Core ===

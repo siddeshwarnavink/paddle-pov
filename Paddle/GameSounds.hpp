@@ -8,7 +8,8 @@ namespace Paddle {
 		SFX_WALL_BOUNCE,
 		SFX_BLOCKS_RESET,
 		SFX_GAME_OVER,
-		SFX_BLOCK_EXPLOSION
+		SFX_BLOCK_EXPLOSION,
+		SFX_BONUS
 	};
 
 	class GameSounds {

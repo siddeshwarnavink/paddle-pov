@@ -58,6 +58,9 @@ namespace Paddle {
 		case SFX_BLOCK_EXPLOSION:
 			filename = "block-explosion.wav";
 			break;
+		case SFX_BONUS:
+			filename = "bonus.wav";
+			break;
 		default:
 			std::cerr << "unknown sound fx" << std::endl;
 			filename = "wall-bounce.mp3";

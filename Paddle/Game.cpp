@@ -2,11 +2,12 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
-#include <random>
 
+#include <random>
 #include <iostream>
 #include <stdexcept>
 #include <array>
+#include <ctime> 
 
 namespace Paddle
 {
@@ -104,6 +105,7 @@ namespace Paddle
 		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
 		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
 		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
+		font->AddText(FontFamily::FONT_FAMILY_BODY, "Bonus +69");
 		font->CreateVertexBuffer();
 	}
 
@@ -141,19 +143,27 @@ namespace Paddle
 		CreateBlocks();
 	}
 
-	void Game::RenderScoreFont(std::string scoreText) {
+	void Game::RenderScoreFont(std::string scoreText, std::string bonusText) {
 		float width = static_cast<float>(swapChain.width());
 		float height = static_cast<float>(swapChain.height());
 
-		float paddingX = 20.0f;
-		float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
+		{
+			float paddingX = 20.0f;
+			float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
 
-		float x = (-width / 2.0f) + paddingX;
-		float y = (-height / 2.0f) + paddingY;
+			float x = (-width / 2.0f) + paddingX;
+			float y = (-height / 2.0f) + paddingY;
+			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
-		const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
+			font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
+		}
 
-		font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
+		if(bonusText.length() > 0) {
+			float scaleX = width / 1080;
+			float scaleY = height / 720;
+
+			font->AddText(FontFamily::FONT_FAMILY_BODY, bonusText, -50.0f * scaleX, -200.0f * scaleY, 0.25f * scaleX, glm::vec3(1.0f));
+		}
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
@@ -175,6 +185,11 @@ namespace Paddle
 		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
 		score = 0;
 
+		time_t lastCollision = time(NULL);
+		time_t lastBonusMessage = time(NULL);
+		uint32_t streak_count = 0;
+		std::string bonusText = "";
+
 		swapChain.recreate();
 		CreatePipeline();
 		font->CreatePipeline();
@@ -193,6 +208,9 @@ namespace Paddle
 				font->CreatePipeline();
 				CreateCommandBuffers();
 			}
+
+			if (difftime(time(NULL), lastBonusMessage) > 3)
+				bonusText = "";
 
 			//
 			// Reset blocks
@@ -214,9 +232,7 @@ namespace Paddle
 			//
 			// Block Collision
 			//
-			auto vel = ballEntity->GetVelocity();
-			const float ballRadius = ballEntity->GetRadius();
-			const glm::vec3 ballPos = ballEntity->GetPosition();
+			bool didBlockCollide = false;
 
 			for (auto it = blocks.begin(); it != blocks.end(); ) {
 				auto block = (*it).get();
@@ -228,15 +244,33 @@ namespace Paddle
 					it = blocks.erase(it);
 				}
 				else if (!block->IsExplosionInitiated() && ballEntity->CheckCollision(block)) {
+					didBlockCollide = true;
 					ballEntity->OnCollision(block);
 					block->InitExplosion();
-					gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
 
+					if(difftime(time(NULL), lastCollision) < 2)
+						streak_count++;
+
+					time(&lastCollision);
+
+					gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
 					score += 10;
 				}
 				else ++it;
 			}
 
+			//
+			// Streak bonus
+			//
+			if(!didBlockCollide &&  streak_count > 0) {
+				const int bonusScore = ++streak_count * 10;
+				score += bonusScore;
+				streak_count = 0;
+				time(&lastBonusMessage);
+
+				bonusText = "Bonus +" + std::to_string(bonusScore);
+				gameSounds->PlaySfx(SFX_BONUS);
+			}
 
 			std::string scoreText = "Score: " + std::to_string(score);
 
@@ -303,7 +337,7 @@ namespace Paddle
 
 					ResetGame();
 					font->ClearText();
-					RenderScoreFont(scoreText);
+					RenderScoreFont(scoreText, bonusText);
 					font->CreateVertexBuffer();
 					prevScore = score;
 					prevGameOver = gameOver;
@@ -314,7 +348,7 @@ namespace Paddle
 				}
 			}
 			else {
-				RenderScoreFont(scoreText);
+				RenderScoreFont(scoreText, bonusText);
 			}
 
 			font->CreateVertexBuffer();
@@ -578,7 +612,6 @@ namespace Paddle
 	}
 }
 
-// TODO: Double, Triple score bonus.
 // TODO: More complex block explosion animation (small cube break into sub-pieces, particle effect, ...)
 // TODO: Ball bounce particle effect.
 // TODO: Cook up something for background (day-night cycle maybe?)
