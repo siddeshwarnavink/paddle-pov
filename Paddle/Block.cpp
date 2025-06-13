@@ -45,9 +45,15 @@ namespace Paddle {
 			for (int y = -1; y <= 1; y += 2) {
 				for (int z = -1; z <= 1; z += 2) {
 					CubePiece piece;
-					piece.position = glm::vec3(x, y, z) * 0.125f;           // center of mini cube
-					piece.velocity = glm::normalize(piece.position) * 1.0f; // outward
-					piece.rotationAxis = glm::sphericalRand(1.0f);          // random axis
+					piece.position = glm::vec3(x, y, z) * 0.125f;
+
+					glm::vec3 baseDir = glm::normalize(piece.position);
+					glm::vec3 randomDir = glm::sphericalRand(0.5f);
+					glm::vec3 velocityDir = glm::normalize(baseDir + randomDir);
+					float speed = glm::linearRand(0.8f, 2.5f);
+
+					piece.velocity = velocityDir * speed;
+					piece.rotationAxis = glm::sphericalRand(1.0f);
 					piece.rotationSpeed = glm::linearRand(1.0f, 3.0f);
 					piece.scale = 1.0f;
 					explodedPieces.push_back(piece);
@@ -61,16 +67,38 @@ namespace Paddle {
 
 		const float deltaTime = 0.01f;
 		bool allGone = true;
+		std::vector<CubePiece> newSubPieces;
+
+
 		for (auto& piece : explodedPieces) {
 			piece.position += piece.velocity * deltaTime;
 			piece.currentAngle += piece.rotationSpeed * deltaTime;
 			piece.scale -= deltaTime * 0.5f;
 			piece.scale = std::max(0.0f, piece.scale);
+
+			if (!piece.hasSubExploded && piece.scale < 0.5f && piece.scale > 0.0f) {
+				piece.hasSubExploded = true;
+				for (int i = 0; i < 4; ++i) {
+					CubePiece subPiece;
+					subPiece.position = piece.position + glm::sphericalRand(0.03f);
+					glm::vec3 randomDir = glm::sphericalRand(1.0f);
+					subPiece.velocity = glm::normalize(randomDir) * glm::linearRand(0.5f, 1.5f);
+					subPiece.rotationAxis = glm::sphericalRand(1.0f);
+					subPiece.rotationSpeed = glm::linearRand(1.0f, 3.0f);
+					subPiece.scale = piece.scale * 0.5f;
+					subPiece.hasSubExploded = true;
+					newSubPieces.push_back(subPiece);
+				}
+			}
+
 			if (piece.scale > 0.0f) allGone = false;
 		}
+
+		explodedPieces.insert(explodedPieces.end(), newSubPieces.begin(), newSubPieces.end());
+
 		if (allGone) {
 			isExploded = true;
-		}
+		}	
 	}
 
 	glm::vec3 Block::GetHalfExtents() const {

@@ -612,8 +612,6 @@ namespace Paddle
 	}
 }
 
-// TODO: More complex block explosion animation (small cube break into sub-pieces, particle effect, ...)
-// TODO: Ball bounce particle effect.
 // TODO: Cook up something for background (day-night cycle maybe?)
 // TODO: Adding power-ups (extra life, paddle machine gun?)
 // TODO: Blinking font effect support.

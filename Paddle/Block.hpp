@@ -15,6 +15,7 @@ namespace Paddle {
 		float rotationSpeed;
 		float currentAngle = 0.0f;
 		float scale = 1.0f;
+		bool hasSubExploded = false;
 	};
 
 	class Block : public GameEntity, public IBounded {
