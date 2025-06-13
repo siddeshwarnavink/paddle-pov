@@ -20,8 +20,9 @@ namespace Vk
 			return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 		}
 		bool IsKeyPressed(int key) const;
-		GLFWwindow *GetWindow() { return window; }
-		void UpdateFramebufferSize();
+		bool IsFullscreen() const { return isFullscreen; }
+		void ToggleFullscreen();
+		void SetAspectViewport(VkCommandBuffer cmd, int fbWidth, int fbHeight);
 		void Close() { glfwSetWindowShouldClose(window, true); }
 
 	private:
@@ -29,6 +30,7 @@ namespace Vk
 		int width;
 		int height;
 		std::string title;
+		bool isFullscreen;
 
 		void InitWindow();
 	};

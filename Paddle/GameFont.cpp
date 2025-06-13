@@ -15,8 +15,8 @@
 #include <array>
 
 namespace Paddle {
-	GameFont::GameFont(Vk::Device& device, VkDescriptorPool& descriptorPool, VkDescriptorSetLayout& descriptorSetLayout, VkBuffer& cameraUbo, Vk::SwapChain& swapChain)
-		: device(device), descriptorPool(descriptorPool), descriptorSetLayout(descriptorSetLayout), cameraUbo(cameraUbo), swapChain(swapChain) {
+	GameFont::GameFont(Vk::Device& device, VkDescriptorPool& descriptorPool, Vk::SwapChain& swapChain)
+		: device(device), descriptorPool(descriptorPool), swapChain(swapChain) {
 		texWidth = 512;
 		texHeight = 512;
 
@@ -25,34 +25,35 @@ namespace Paddle {
 
 		CreateFonts();
 		CreateFontBuffers();
-
 		CreateDescriptorSet();
-		CreateFontPipelineLayout();
-		CreatePipeline();
+		CreatePipelineLayout();
 	}
 
 	GameFont::~GameFont() {
 		for (auto it = fontFilePath.begin(); it != fontFilePath.end(); ++it) {
-			if (fontsTable[(*it).first].vertexBuffer != VK_NULL_HANDLE)
-				vkDestroyBuffer(device.device(), fontsTable[(*it).first].vertexBuffer, nullptr);
-			if (fontsTable[(*it).first].vertexBufferMemory != VK_NULL_HANDLE)
-				vkFreeMemory(device.device(), fontsTable[(*it).first].vertexBufferMemory, nullptr);
-			if (fontsTable[(*it).first].stagingBuffer != VK_NULL_HANDLE)
-				vkDestroyBuffer(device.device(), fontsTable[(*it).first].stagingBuffer, nullptr);
-			if (fontsTable[(*it).first].stagingBufferMemory != VK_NULL_HANDLE)
-				vkFreeMemory(device.device(), fontsTable[(*it).first].stagingBufferMemory, nullptr);
-			if (fontsTable[(*it).first].fontImageView != VK_NULL_HANDLE)
-				vkDestroyImageView(device.device(), fontsTable[(*it).first].fontImageView, nullptr);
-			if (fontsTable[(*it).first].fontImage != VK_NULL_HANDLE)
-				vkDestroyImage(device.device(), fontsTable[(*it).first].fontImage, nullptr);
-			if (fontsTable[(*it).first].fontImageMemory != VK_NULL_HANDLE)
-				vkFreeMemory(device.device(), fontsTable[(*it).first].fontImageMemory, nullptr);
-			if (fontsTable[(*it).first].fontSampler != VK_NULL_HANDLE)
-				vkDestroySampler(device.device(), fontsTable[(*it).first].fontSampler, nullptr);
-			delete[] fontsTable[(*it).first].bitmap;
+			FontFamilyData font = fontsTable[(*it).first];
+			if (font.vertexBuffer != VK_NULL_HANDLE)
+				vkDestroyBuffer(device.device(), font.vertexBuffer, nullptr);
+			if (font.vertexBufferMemory != VK_NULL_HANDLE)
+				vkFreeMemory(device.device(), font.vertexBufferMemory, nullptr);
+			if (font.stagingBuffer != VK_NULL_HANDLE)
+				vkDestroyBuffer(device.device(), font.stagingBuffer, nullptr);
+			if (font.stagingBufferMemory != VK_NULL_HANDLE)
+				vkFreeMemory(device.device(), font.stagingBufferMemory, nullptr);
+			if (font.fontImageView != VK_NULL_HANDLE)
+				vkDestroyImageView(device.device(), font.fontImageView, nullptr);
+			if (font.fontImage != VK_NULL_HANDLE)
+				vkDestroyImage(device.device(), font.fontImage, nullptr);
+			if (font.fontImageMemory != VK_NULL_HANDLE)
+				vkFreeMemory(device.device(), font.fontImageMemory, nullptr);
+			if (font.fontSampler != VK_NULL_HANDLE)
+				vkDestroySampler(device.device(), font.fontSampler, nullptr);
+			delete[] font.bitmap;
 		}
 		if (fontPipelineLayout != VK_NULL_HANDLE)
 			vkDestroyPipelineLayout(device.device(), fontPipelineLayout, nullptr);
+		if (descriptorSetLayout != VK_NULL_HANDLE)
+			vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
 	}
 
 	void GameFont::CreateFonts() {
@@ -229,6 +230,25 @@ namespace Paddle {
 	}
 
 	void GameFont::CreateDescriptorSet() {
+		//
+		// Descriptor set layout
+		//
+		VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+		samplerLayoutBinding.binding = 1;
+		samplerLayoutBinding.descriptorCount = 1;
+		samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerLayoutBinding.pImmutableSamplers = nullptr;
+		samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = 1;
+		layoutInfo.pBindings = &samplerLayoutBinding;
+
+		if (vkCreateDescriptorSetLayout(device.device(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create font descriptor set layout!");
+		}
+
 		const auto& fontFamilies = fontsTable;
 		for (const auto& kv : fontFamilies) {
 			FontFamily family = kv.first;
@@ -244,20 +264,6 @@ namespace Paddle {
 				throw std::runtime_error("failed to allocate font descriptor set!");
 			}
 
-			VkDescriptorBufferInfo bufferInfo{};
-			bufferInfo.buffer = cameraUbo;
-			bufferInfo.offset = 0;
-			bufferInfo.range = sizeof(CameraUbo);
-
-			VkWriteDescriptorSet descriptorWriteUBO{};
-			descriptorWriteUBO.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWriteUBO.dstSet = fontDescriptorSet;
-			descriptorWriteUBO.dstBinding = 0;
-			descriptorWriteUBO.dstArrayElement = 0;
-			descriptorWriteUBO.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			descriptorWriteUBO.descriptorCount = 1;
-			descriptorWriteUBO.pBufferInfo = &bufferInfo;
-
 			VkDescriptorImageInfo imageInfo{};
 			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			imageInfo.imageView = fontsTable[family].fontImageView;
@@ -272,24 +278,26 @@ namespace Paddle {
 			descriptorWriteImage.descriptorCount = 1;
 			descriptorWriteImage.pImageInfo = &imageInfo;
 
-			std::array<VkWriteDescriptorSet, 2> writes = { descriptorWriteUBO, descriptorWriteImage };
-			vkUpdateDescriptorSets(device.device(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+			vkUpdateDescriptorSets(device.device(), 1, &descriptorWriteImage, 0, nullptr);
 
 			fontsTable[family].fontDescriptorSets = fontDescriptorSet;
 		}
 	}
 
-	void GameFont::CreateFontPipelineLayout() {
+	void GameFont::CreatePipelineLayout() {
 		VkPushConstantRange pushConstantRange{};
 		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		pushConstantRange.offset = 0;
 		pushConstantRange.size = sizeof(glm::mat4);
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
 		pipelineLayoutInfo.setLayoutCount = 1;
 		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+
 		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &fontPipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create font pipeline layout!");
 		}
@@ -343,15 +351,6 @@ namespace Paddle {
 		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 		pipelineConfig.vertexInputInfo = vertexInputInfo;
-		pipelineConfig.depthStencilInfo.depthTestEnable = VK_FALSE;
-		pipelineConfig.depthStencilInfo.depthWriteEnable = VK_FALSE;
-		pipelineConfig.colorBlendAttachment.blendEnable = VK_TRUE;
-		pipelineConfig.colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		pipelineConfig.colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		pipelineConfig.colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-		pipelineConfig.colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		pipelineConfig.colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		pipelineConfig.colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
 		fontPipeline = std::make_unique<Vk::Pipeline>(
 			device,

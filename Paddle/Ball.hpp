@@ -9,11 +9,12 @@
 namespace Paddle {
 	class Ball : public GameEntity {
 	public:
-		Ball(Vk::Device& device, float x, float y, float z);
+		Ball(Vk::Device& device);
 
 		Ball(const Ball&) = delete;
 		Ball& operator=(const Ball&) = delete;
 
+		void Reset();
 		bool CheckCollision(GameEntity* other) override;
 		void OnCollision(GameEntity* other);
 		void Update(UpdateArgs args = UpdateArgs{}) override;

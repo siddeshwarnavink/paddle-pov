@@ -8,16 +8,23 @@
 #include <cstring>
 
 namespace Paddle {
-	const uint32_t slices = 64;
-	const uint32_t stacks = 32;
+	const auto DEFAULT_POSITION = glm::vec3(3.0f, 0.0f, 0.0f);
+	const auto DEFAULT_VELOCITY = glm::vec3(-1.0f, 0.5f, 0.0f);
 
-	Ball::Ball(Vk::Device& device, float x, float y, float z)
+	const uint32_t BALL_SLICES = 64;
+	const uint32_t BALL_STACKS = 32;
+
+	Ball::Ball(Vk::Device& device)
 		: GameEntity(device) {
 		verticesInstance = GenerateVertices();
 		indicesInstance = GenerateIndices();
-		SetPosition(glm::vec3(x, y, z));
-		SetVelocity(glm::vec3(-1.0f, 0.5f, 0.0f));
+		Reset();
 		InitialiseEntity();
+	}
+
+	void Ball::Reset() {
+		SetPosition(DEFAULT_POSITION);
+		SetVelocity(DEFAULT_VELOCITY);
 	}
 
 	bool CheckAABBSphereCollision(const glm::vec3& boxMin, const glm::vec3& boxMax, const glm::vec3& sphereCenter, float sphereRadius) {
@@ -78,10 +85,10 @@ namespace Paddle {
 		//
 
 		std::vector<Vertex> vertices;
-		for (int i = 0; i <= stacks; ++i) {
-			float phi = glm::pi<float>() * i / stacks;
-			for (int j = 0; j <= slices; ++j) {
-				float theta = 2 * glm::pi<float>() * j / slices;
+		for (int i = 0; i <= BALL_STACKS; ++i) {
+			float phi = glm::pi<float>() * i / BALL_STACKS;
+			for (int j = 0; j <= BALL_SLICES; ++j) {
+				float theta = 2 * glm::pi<float>() * j / BALL_SLICES;
 
 				float x = radius * sin(phi) * cos(theta);
 				float y = radius * cos(phi);
@@ -90,7 +97,7 @@ namespace Paddle {
 				glm::vec3 pos = glm::vec3(x, y, z);
 				glm::vec3 color = glm::vec3(194.0f / 255.f, 64.0f / 255.0f, 62.0f / 255.0f); // #c2403e
 				glm::vec3 normal = glm::normalize(pos);
-				glm::vec2 uv = glm::vec2((float)j / slices, (float)i / stacks);
+				glm::vec2 uv = glm::vec2((float)j / BALL_SLICES, (float)i / BALL_STACKS);
 
 				vertices.push_back({ pos, color, normal, uv });
 			}
@@ -100,10 +107,10 @@ namespace Paddle {
 
 	std::vector<uint32_t> Ball::GenerateIndices() {
 		std::vector<uint32_t> indices;
-		for (int i = 0; i < stacks; ++i) {
-			for (int j = 0; j < slices; ++j) {
-				int first = i * (slices + 1) + j;
-				int second = first + slices + 1;
+		for (int i = 0; i < BALL_STACKS; ++i) {
+			for (int j = 0; j < BALL_SLICES; ++j) {
+				int first = i * (BALL_SLICES + 1) + j;
+				int second = first + BALL_SLICES + 1;
 
 				indices.push_back(first);
 				indices.push_back(second);

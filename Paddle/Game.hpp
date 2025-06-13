@@ -8,6 +8,7 @@
 #include "GameCamera.hpp"
 #include "PlayerPaddle.hpp"
 #include "Wall.hpp"
+#include "Ball.hpp"
 #include "GameFont.hpp"
 #include "GameSounds.hpp"
 
@@ -22,42 +23,42 @@ namespace Paddle {
 		Game();
 		~Game();
 
-		static constexpr int WIDTH = 1080;
-		static constexpr int HEIGHT = 720;
-
 		Game(const Game&) = delete;
 		Game& operator=(const Game&) = delete;
 
 		void run();
 
 	private:
+		// === Initialization ===
 		void CreateGameSounds();
+		void CreateGameEntities();
 		void CreateBlocks();
-		void CreateBall();
-		void CreatePaddle();
-		void CreateWalls();
 		void CreateGameFont();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
-		void DrawFrame();
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
 		void CreateUniformBuffer();
 		void CreateDescriptorSetLayout();
 		void CreateDescriptorPool();
 		void CreateDescriptorSet();
+
+		// === Update / Logic ===
 		void UpdateUniformBuffer(uint32_t currentImage);
 		void UpdateAllEntitiesPosition(const glm::vec3& delta);
 		void ResetGame();
 		void ResetEntities();
+
+		// === Rendering ===
+		void DrawFrame();
 		void RenderScoreFont(std::string scoreText);
 		void RenderGameOverFont(std::string scoreText);
 
-		bool isFullscreen;
-		Vk::Window window{ WIDTH, HEIGHT, "Paddle Game" };
-		Vk::Device device{ window };
-		Vk::SwapChain swapChain{ device, window.getExtent() };
+		// === Window & Vulkan Core ===
+		Vk::Window window;
+		Vk::Device device;
+		Vk::SwapChain swapChain;
 		std::unique_ptr<Vk::Pipeline> pipeline;
 		VkPipelineLayout pipelineLayout;
 		std::vector<VkCommandBuffer> commandBuffers;
@@ -68,17 +69,19 @@ namespace Paddle {
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet cameraDescriptorSet;
 
+		// === Game State ===
 		bool gameOver = false;
+		int score;
 
+		// === Game Components ===
 		std::unique_ptr<GameSounds> gameSounds;
-		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
-		std::unique_ptr<GameEntity> ballEntity;
+		std::unique_ptr<GameFont> font;
+		std::unique_ptr<GameCamera> camera;
+		std::unique_ptr<Ball> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
 		std::vector<std::unique_ptr<GameEntity>> wallEntities;
 		std::vector<std::unique_ptr<Block>> blocks;
-		std::unique_ptr<GameFont> font;
-		GameCamera camera;
-
-		int score;
+		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
 	};
+
 }

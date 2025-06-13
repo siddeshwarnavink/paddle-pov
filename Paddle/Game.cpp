@@ -1,11 +1,5 @@
 #include "Game.hpp"
-#include "Block.hpp"
-#include "Ball.hpp"
-#include "GameEntity.hpp"
-#include "GameCamera.hpp"
-#include "PlayerPaddle.hpp"
 
-#include <GLFW/glfw3.h>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 #include <random>
@@ -16,42 +10,21 @@
 
 namespace Paddle
 {
-	constexpr int DESIGNED_WIDTH = 1920;
-	constexpr int DESIGNED_HEIGHT = 1080;
-	constexpr float DESIGNED_ASPECT = float(DESIGNED_WIDTH) / float(DESIGNED_HEIGHT);
+	static constexpr int WIDTH = 1080;
+	static constexpr int HEIGHT = 720;
 
-	void SetAspectViewport(VkCommandBuffer cmd, int fbWidth, int fbHeight) {
-		float fbAspect = float(fbWidth) / float(fbHeight);
-		int vpWidth, vpHeight, vpX, vpY;
-		if (fbAspect > DESIGNED_ASPECT) {
-			vpHeight = fbHeight;
-			vpWidth = int(DESIGNED_ASPECT * fbHeight);
-			vpX = (fbWidth - vpWidth) / 2;
-			vpY = 0;
-		}
-		else {
-			vpWidth = fbWidth;
-			vpHeight = int(fbWidth / DESIGNED_ASPECT);
-			vpX = 0;
-			vpY = (fbHeight - vpHeight) / 2;
-		}
+	static constexpr float PADDLE_SPEED = 0.05f;
 
-		VkViewport viewport{};
-		viewport.x = float(vpX);
-		viewport.y = float(vpY);
-		viewport.width = float(vpWidth);
-		viewport.height = float(vpHeight);
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
+	static constexpr float BLOCK_SPACING = 0.65f;
 
-		vkCmdSetViewport(cmd, 0, 1, &viewport);
-	}
+	static constexpr float WALL_LENGTH = 10.0f;
+	static constexpr float WALL_SIDE_OFFSET = 3.0f;
 
-	Game::Game()
-		: window(WIDTH, HEIGHT, "Paddle POV"),
+	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV"),
 		device(window),
-		swapChain(device, window.getExtent())
-	{
+		swapChain(device, window.getExtent()) {
+		camera = std::make_unique<GameCamera>();
+
 		CreateGameSounds();
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
@@ -59,12 +32,8 @@ namespace Paddle
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
+		CreateGameEntities();
 		CreateGameFont();
-		CreateBlocks();
-		CreateBall();
-		CreatePaddle();
-		CreateWalls();
-		CreateCommandBuffers();
 	}
 
 	Game::~Game() {
@@ -81,20 +50,35 @@ namespace Paddle
 		gameSounds->PlayBgm();
 	}
 
-	void Game::CreateBall() {
-		ballEntity = std::make_unique<Ball>(device, 3.0f, 0.0f, 0.0f);
+	void Game::CreateGameEntities() {
+		CreateBlocks();
+
+		ballEntity = std::make_unique<Ball>(device);
+		paddleEntity = std::make_unique<PlayerPaddle>(device);
+
+		//
+		// Create walls
+		//
+		{
+			auto leftWall = std::make_unique<Wall>(device, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+			wallEntities.emplace_back(std::move(leftWall));
+
+			auto rightWall = std::make_unique<Wall>(device, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+			wallEntities.emplace_back(std::move(rightWall));
+
+			// Wall behind all the blocks
+			auto frontWall = std::make_unique<Wall>(device, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
+			wallEntities.emplace_back(std::move(frontWall));
+		}
+
 	}
 
-	void Game::CreateBlocks() {
-		float spacing = 0.65f;
-		float startX = -spacing * 2;
-		float startY = -spacing * 2;
 
-		//
-		// Random block color
-		// https://www.color-hex.com/color-palette/3811
-		//
-		std::vector<glm::vec3> colors = {
+	void Game::CreateBlocks() {
+		const float startX = -BLOCK_SPACING * 2;
+		const float startY = -BLOCK_SPACING * 2;
+
+		const std::vector<glm::vec3> colors = {
 			{124.0f / 255.0f, 156.0f / 255.0f, 228.0f / 255.0f}, // #7c9ce4
 			{100.0f / 255.0f, 230.0f / 255.0f, 215.0f / 255.0f}, // #64e6d7
 			{231.0f / 255.0f, 235.0f / 255.0f, 185.0f / 255.0f}, // #e7ebb9
@@ -105,35 +89,18 @@ namespace Paddle
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
 
-		//for (int i = 0; i < 3; ++i) {
-		for (int i = 0; i < 2; ++i) {
-			//for (int j = 0; j < 8; ++j) {
-			for (int j = 0; j < 2; ++j) {
-				float x = startX + i * spacing;
-				float y = startY + j * spacing;
+		for (int i = 0; i < 3; ++i) {
+			for (int j = 0; j < 8; ++j) {
+				float x = startX + i * BLOCK_SPACING;
+				float y = startY + j * BLOCK_SPACING;
 				glm::vec3 color = colors[dis(gen)];
 				blocks.emplace_back(std::make_unique<Block>(device, x, y, 0.0f, color));
 			}
 		}
 	}
 
-	void Game::CreateWalls() {
-		const float wallLength = 10.0f;
-		const float sideOffset = 3.0f;
-
-		auto leftWall = std::make_unique<Wall>(device, 6.0f, -sideOffset, 0.0f, glm::vec3(wallLength, 1.0f, 0.1f));
-		wallEntities.emplace_back(std::move(leftWall));
-
-		auto rightWall = std::make_unique<Wall>(device, 6.0f, sideOffset + 2.0f, 0.0f, glm::vec3(wallLength, 1.0f, 0.1f));
-		wallEntities.emplace_back(std::move(rightWall));
-
-		// Wall behind all the blocks
-		auto frontWall = std::make_unique<Wall>(device, -4.0f, sideOffset, 0.0f, glm::vec3(0.1f, wallLength, 1.0f));
-		wallEntities.emplace_back(std::move(frontWall));
-	}
-
 	void Game::CreateGameFont() {
-		font = std::make_unique<GameFont>(device, descriptorPool, descriptorSetLayout, cameraUbo, swapChain);
+		font = std::make_unique<GameFont>(device, descriptorPool, swapChain);
 		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
 		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
 		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
@@ -164,19 +131,10 @@ namespace Paddle
 	}
 
 	void Game::ResetEntities() {
-		camera.SetPosition(glm::vec3(6.0f, 0.0f, 0.0f));
+		camera->Reset();
+		paddleEntity->Reset();
+		ballEntity->Reset();
 
-		paddleEntity->SetPosition(glm::vec3(5.5f, 0.0f, 0.0f));
-
-		//
-		// Rest ball
-		auto* ball = static_cast<Paddle::Ball*>(ballEntity.get());
-		ball->SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-		ball->SetVelocity(glm::vec3(-1.0f, 0.5f, 0.0f));
-
-		//
-		// Reset blocks
-		//
 		for (auto& block : blocks)
 			pendingDeleteBlocks.push_back(std::move(block));
 		blocks.clear();
@@ -188,12 +146,12 @@ namespace Paddle
 		float height = static_cast<float>(swapChain.height());
 
 		float paddingX = 20.0f;
-		float paddingY = isFullscreen ? 60.0f : 40.0f;
+		float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
 
 		float x = (-width / 2.0f) + paddingX;
 		float y = (-height / 2.0f) + paddingY;
 
-		const float fontSize = isFullscreen ? 1.0f : 0.5f;
+		const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
 		font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
 	}
@@ -211,23 +169,12 @@ namespace Paddle
 	}
 
 	void Game::run() {
-		bool prevF12Pressed = false;
 		bool prevF10Pressed = false;
 		bool prevGameOver = false;
 		int prevScore = -1;
-
 		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
-
 		score = 0;
-		isFullscreen = true;
 
-		int windowedX = 100, windowedY = 100, windowedW = WIDTH, windowedH = HEIGHT;
-		GLFWwindow* glfwWin = window.GetWindow();
-		GLFWmonitor* mon = glfwGetPrimaryMonitor();
-		const GLFWvidmode* mode = glfwGetVideoMode(mon);
-
-		glfwSetWindowMonitor(glfwWin, mon, 0, 0, mode->width, mode->height, mode->refreshRate);
-		window.UpdateFramebufferSize();
 		swapChain.recreate();
 		CreatePipeline();
 		font->CreatePipeline();
@@ -240,21 +187,7 @@ namespace Paddle
 			//
 			bool f10Pressed = window.IsKeyPressed(GLFW_KEY_F10);
 			if (f10Pressed && !prevF10Pressed) {
-				if (isFullscreen) {
-					windowedW = WIDTH;
-					windowedH = HEIGHT;
-					windowedX = 100;
-					windowedY = 100;
-					glfwSetWindowMonitor(glfwWin, nullptr, windowedX, windowedY, windowedW, windowedH, 0);
-					isFullscreen = false;
-				}
-				else {
-					mon = glfwGetPrimaryMonitor();
-					mode = glfwGetVideoMode(mon);
-					glfwSetWindowMonitor(glfwWin, mon, 0, 0, mode->width, mode->height, mode->refreshRate);
-					isFullscreen = true;
-				}
-				window.UpdateFramebufferSize();
+				window.ToggleFullscreen();
 				swapChain.recreate();
 				CreatePipeline();
 				font->CreatePipeline();
@@ -281,9 +214,8 @@ namespace Paddle
 			//
 			// Block Collision
 			//
-			auto* ball = static_cast<Paddle::Ball*>(ballEntity.get());
-			auto vel = ball->GetVelocity();
-			const float ballRadius = ball->GetRadius();
+			auto vel = ballEntity->GetVelocity();
+			const float ballRadius = ballEntity->GetRadius();
 			const glm::vec3 ballPos = ballEntity->GetPosition();
 
 			for (auto it = blocks.begin(); it != blocks.end(); ) {
@@ -295,11 +227,11 @@ namespace Paddle
 					pendingDeleteBlocks.push_back(std::move(*it));
 					it = blocks.erase(it);
 				}
-				else if (!block->IsExplosionInitiated() && ball->CheckCollision(block)) {
-					ball->OnCollision(block);
+				else if (!block->IsExplosionInitiated() && ballEntity->CheckCollision(block)) {
+					ballEntity->OnCollision(block);
 					block->InitExplosion();
 					gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
-					
+
 					score += 10;
 				}
 				else ++it;
@@ -312,8 +244,8 @@ namespace Paddle
 			// Paddle Collision
 			//
 			GameEntity* paddle = paddleEntity.get();
-			if (ball->CheckCollision(paddle)) {
-				ball->OnCollision(paddle);
+			if (ballEntity->CheckCollision(paddle)) {
+				ballEntity->OnCollision(paddle);
 				gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
 			}
 
@@ -323,8 +255,8 @@ namespace Paddle
 			for (size_t i = 0; i < wallEntities.size(); ++i) {
 				auto& entity = wallEntities[i];
 
-				if (ball->CheckCollision(entity.get())) {
-					ball->OnCollision(entity.get());
+				if (ballEntity->CheckCollision(entity.get())) {
+					ballEntity->OnCollision(entity.get());
 					gameSounds->PlaySfx(SFX_WALL_BOUNCE);
 				}
 			}
@@ -336,9 +268,9 @@ namespace Paddle
 				glm::vec3 paddleDelta = glm::vec3(0.0f);
 
 				if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
-					paddleDelta = glm::vec3(0.0f, 0.05f, 0.0f);
+					paddleDelta = glm::vec3(0.0f, PADDLE_SPEED, 0.0f);
 				if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
-					paddleDelta = glm::vec3(0.0f, -0.05f, 0.0f);
+					paddleDelta = glm::vec3(0.0f, -PADDLE_SPEED, 0.0f);
 
 				if (paddleDelta != glm::vec3(0.0f)) {
 					UpdateAllEntitiesPosition(paddleDelta);
@@ -409,14 +341,15 @@ namespace Paddle
 		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		pushConstantRange.offset = 0;
 		pushConstantRange.size = sizeof(glm::mat4);
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = 1;
 		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) !=
-			VK_SUCCESS) {
+
+		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
 		}
 	}
@@ -475,10 +408,6 @@ namespace Paddle
 			pipelineConfig);
 	}
 
-	void Game::CreatePaddle() {
-		paddleEntity = std::make_unique<PlayerPaddle>(device, 5.5f, 0.0f, 0.0f);
-	}
-
 	void Game::CreateCommandBuffers() {
 		commandBuffers.resize(swapChain.imageCount());
 
@@ -488,9 +417,8 @@ namespace Paddle
 		allocInfo.commandPool = device.getCommandPool();
 		allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
-		if (vkAllocateCommandBuffers(device.device(), &allocInfo, commandBuffers.data()) !=
-			VK_SUCCESS) {
-			throw std::runtime_error("failed to allocate command buffers!");
+		if (vkAllocateCommandBuffers(device.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+			throw std::runtime_error("failed to allocate command buffers");
 		}
 
 		for (int i = 0; i < commandBuffers.size(); i++) {
@@ -498,7 +426,7 @@ namespace Paddle
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
 			if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-				throw std::runtime_error("failed to begin recording command buffer!");
+				throw std::runtime_error("failed to begin recording command buffer");
 			}
 
 			VkRenderPassBeginInfo renderPassInfo{};
@@ -517,26 +445,20 @@ namespace Paddle
 
 			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			SetAspectViewport(commandBuffers[i], swapChain.width(), swapChain.height());
 			pipeline->bind(commandBuffers[i]);
 
-			// Draw all blocks
+			//
+			// Draw all entities
+			//
 			for (auto& block : blocks)
 				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
-			//
-			// Draw the ball
-			//
 			ballEntity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
-
-			//
-			// Font rendering
-			//
 			font->Draw(commandBuffers[i]);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
-				throw std::runtime_error("failed to record command buffer!");
+				throw std::runtime_error("failed to record command buffer");
 			}
 		}
 	}
@@ -550,32 +472,24 @@ namespace Paddle
 		UpdateUniformBuffer(imageIndex);
 		result = swapChain.submitCommandBuffers(&commandBuffers[imageIndex], &imageIndex);
 		if (result != VK_SUCCESS) {
-			throw std::runtime_error("failed to present swap chain image!");
+			throw std::runtime_error("failed to present swap chain image");
 		}
 	}
 
 	void Game::CreateUniformBuffer() {
-		//
-		// Create UBO for camera
-		//
-		{
-			VkDeviceSize bufferSize = sizeof(CameraUbo);
-			device.createBuffer(
-				bufferSize,
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-				cameraUbo,
-				cameraUboMemory);
-		}
+		VkDeviceSize bufferSize = sizeof(CameraUbo);
+		device.createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			cameraUbo,
+			cameraUboMemory);
 	}
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
-		//
-		// Update camera UBO
-		//
 		CameraUbo ubo{};
-		glm::vec3 camPos = camera.GetPosition();
-		glm::vec3 camTarget = camera.GetTarget();
+		glm::vec3 camPos = camera->GetPosition();
+		glm::vec3 camTarget = camera->GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
 		float aspect = float(swapChain.width()) / float(swapChain.height());
 		ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
@@ -587,9 +501,6 @@ namespace Paddle
 	}
 
 	void Game::CreateDescriptorSet() {
-		//
-		// Camera UBO descriptor set
-		//
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = descriptorPool;

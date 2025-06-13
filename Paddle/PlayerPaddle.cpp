@@ -3,7 +3,9 @@
 #include <cstring>
 
 namespace Paddle {
-	PlayerPaddle::PlayerPaddle(Vk::Device& device, float x, float y, float z)
+	const auto DEFAULT_POSITION = glm::vec3(5.5f, 0.0f, 0.0f);
+
+	PlayerPaddle::PlayerPaddle(Vk::Device& device)
 		: GameEntity(device)  {
 		verticesInstance = {
 			// Front face
@@ -25,8 +27,12 @@ namespace Paddle {
 			3, 2, 6, 6, 7, 3,  // Top face
 			4, 5, 1, 1, 0, 4   // Bottom face
 		};
-		SetPosition(glm::vec3(x, y, z));
+		Reset();
 		InitialiseEntity();
+	}
+
+	void PlayerPaddle::Reset() {
+		SetPosition(DEFAULT_POSITION);
 	}
 
 	bool PlayerPaddle::CheckCollision(GameEntity* other) {

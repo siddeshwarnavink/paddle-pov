@@ -34,29 +34,25 @@ namespace Paddle {
 		unsigned char* bitmap = nullptr;
 		int fontAscent = 0;
 
-		// --- Vulkan resources for font image ---
+		// --- Staging buffer ---
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+
+		// --- Vulkan resources for ---
 		VkImage fontImage = VK_NULL_HANDLE;
 		VkDeviceMemory fontImageMemory = VK_NULL_HANDLE;
 		VkImageView fontImageView = VK_NULL_HANDLE;
 		VkSampler fontSampler = VK_NULL_HANDLE;
-
-		// --- Vulkan buffer for GPU vertex data ---
 		VkDescriptorSet fontDescriptorSets;
 		VkBuffer vertexBuffer = VK_NULL_HANDLE;
 		VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-
-		// --- CPU-side staging buffer for uploading data ---
-		VkBuffer stagingBuffer = VK_NULL_HANDLE;
-		VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-
-		// --- Font rendering instance data ---
 		std::vector<Vertex> verticesInstance;
 	};
 
 
 	class GameFont {
 	public:
-		GameFont(Vk::Device& device, VkDescriptorPool& descriptorPool, VkDescriptorSetLayout& descriptorSetLayout, VkBuffer& cameraUbo, Vk::SwapChain& swapChain);
+		GameFont(Vk::Device& device, VkDescriptorPool& descriptorPool, Vk::SwapChain& swapChain);
 		~GameFont();
 
 		GameFont(const GameFont&) = delete;
@@ -78,8 +74,7 @@ namespace Paddle {
 	private:
 		Vk::Device& device;
 		VkDescriptorPool& descriptorPool;
-		VkDescriptorSetLayout& descriptorSetLayout;
-		VkBuffer& cameraUbo;
+		VkDescriptorSetLayout descriptorSetLayout;
 		Vk::SwapChain& swapChain;
 		std::unique_ptr<Vk::Pipeline> fontPipeline;
 		VkPipelineLayout fontPipelineLayout = VK_NULL_HANDLE;
@@ -90,7 +85,7 @@ namespace Paddle {
 
 		void CreateFonts();
 		void CreateFontBuffers();
+		void CreatePipelineLayout();
 		void CreateDescriptorSet();
-		void CreateFontPipelineLayout();
 	};
 }
