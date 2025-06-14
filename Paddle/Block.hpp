@@ -1,11 +1,11 @@
 #pragma once
+
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
 #include <vector>
 #include <memory>
 
-#include "VkDevice.hpp"
 #include "GameEntity.hpp"
 #include "Block.hpp"
 
@@ -22,17 +22,17 @@ namespace Paddle {
 
 	class Block : public GameEntity, public IBounded {
 	public:
-		Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color);
+		Block(GameContext &context, float x, float y, float z, const glm::vec3& color);
 
 		Block(const Block&) = delete;
 		Block& operator=(const Block&) = delete;
 
 		void SetAllBlocksRef(std::vector<std::unique_ptr<Block>>* ref) { allBlocksRef = ref; } 
-		static void CreateBlocks(Vk::Device& device, std::vector<std::unique_ptr<Block>>& blocks);
+		static void CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks);
 
 		glm::vec3 GetHalfExtents() const override;
 		void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) override;
-		void Update(UpdateArgs args = UpdateArgs{}) override;
+		void Update() override;
 
 		void InitExplosion();
 		bool IsExploded() { return isExploded; }

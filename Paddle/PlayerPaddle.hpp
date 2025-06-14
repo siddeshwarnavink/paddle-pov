@@ -3,13 +3,13 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "VkDevice.hpp"
+#include "GameContext.hpp"
 #include "GameEntity.hpp"
 
 namespace Paddle {
 	class PlayerPaddle : public GameEntity, public IBounded {
 	public:
-		PlayerPaddle(Vk::Device& device);
+		PlayerPaddle(GameContext& context);
 
 		PlayerPaddle(const PlayerPaddle&) = delete;
 		PlayerPaddle& operator=(const PlayerPaddle&) = delete;

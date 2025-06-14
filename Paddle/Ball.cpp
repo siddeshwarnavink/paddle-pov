@@ -14,8 +14,7 @@ namespace Paddle {
 	const uint32_t BALL_SLICES = 64;
 	const uint32_t BALL_STACKS = 32;
 
-	Ball::Ball(Vk::Device& device)
-		: GameEntity(device) {
+	Ball::Ball(GameContext& context) : GameEntity(context) {
 		verticesInstance = GenerateVertices();
 		indicesInstance = GenerateIndices();
 		Reset();
@@ -72,22 +71,21 @@ namespace Paddle {
 		}
 	}
 
-	void Ball::Update(UpdateArgs args) {
-		const int score = args.i;
+	void Ball::Update() {
 		glm::vec3 pos = GetPosition();
 
 		float speedDelta = 0.02f;
 
-		if (score >= 20) {
+		if (context.score >= 20) {
 			speedDelta = 0.04f;
 		}
-		else if (score >= 50) {
+		else if (context.score >= 50) {
 			speedDelta = 0.06f;
 		}
-		else if (score >= 100) {
+		else if (context.score >= 100) {
 			speedDelta = 0.08f;
 		}
-		else if (score >= 200) {
+		else if (context.score >= 200) {
 			speedDelta = 0.1f;
 		}
 

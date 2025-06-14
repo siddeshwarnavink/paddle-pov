@@ -3,14 +3,12 @@
 #include "VkWindow.hpp"
 #include "VkPipeline.hpp"
 #include "VkSwapChain.hpp"
-#include "VkDevice.hpp"
 #include "Block.hpp"
-#include "GameCamera.hpp"
 #include "PlayerPaddle.hpp"
 #include "Wall.hpp"
 #include "Ball.hpp"
 #include "GameFont.hpp"
-#include "GameSounds.hpp"
+#include "GameContext.hpp"
 
 #include <memory>
 #include <vector>
@@ -30,7 +28,6 @@ namespace Paddle {
 
 	private:
 		// === Initialization ===
-		void CreateGameSounds();
 		void CreateGameEntities();
 		void CreateGameFont();
 		void CreatePipelineLayout();
@@ -68,14 +65,8 @@ namespace Paddle {
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet cameraDescriptorSet;
 
-		// === Game State ===
-		bool gameOver = false;
-		int score;
-
 		// === Game Components ===
-		std::unique_ptr<GameSounds> gameSounds;
-		std::unique_ptr<GameFont> font;
-		std::unique_ptr<GameCamera> camera;
+		std::unique_ptr<GameContext> context;
 		std::unique_ptr<Ball> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
 		std::vector<std::unique_ptr<Wall>> wallEntities;

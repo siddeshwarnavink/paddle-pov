@@ -13,14 +13,14 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Source Files\vk">
-      <UniqueIdentifier>{3b587f66-d1ee-46ae-b286-bdc5a07d5232}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\vk">
-      <UniqueIdentifier>{b0e7b394-fca1-4511-bf07-0da0cd4da007}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Vendor">
       <UniqueIdentifier>{b6b312fd-df2a-410c-873f-de72cb578722}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Core">
+      <UniqueIdentifier>{b0e7b394-fca1-4511-bf07-0da0cd4da007}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core">
+      <UniqueIdentifier>{3b587f66-d1ee-46ae-b286-bdc5a07d5232}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -28,19 +28,19 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VkWindow.cpp">
-      <Filter>Source Files\vk</Filter>
+      <Filter>Source Files\Core</Filter>
     </ClCompile>
     <ClCompile Include="Game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VkPipeline.cpp">
-      <Filter>Source Files\vk</Filter>
+      <Filter>Source Files\Core</Filter>
     </ClCompile>
     <ClCompile Include="VkDevice.cpp">
-      <Filter>Source Files\vk</Filter>
+      <Filter>Source Files\Core</Filter>
     </ClCompile>
     <ClCompile Include="VkSwapChain.cpp">
-      <Filter>Source Files\vk</Filter>
+      <Filter>Source Files\Core</Filter>
     </ClCompile>
     <ClCompile Include="Block.cpp">
       <Filter>Source Files</Filter>
@@ -72,16 +72,16 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="VkWindow.hpp">
-      <Filter>Header Files\vk</Filter>
+      <Filter>Header Files\Core</Filter>
     </ClInclude>
     <ClInclude Include="VkPipeline.hpp">
-      <Filter>Header Files\vk</Filter>
+      <Filter>Header Files\Core</Filter>
     </ClInclude>
     <ClInclude Include="VkDevice.hpp">
-      <Filter>Header Files\vk</Filter>
+      <Filter>Header Files\Core</Filter>
     </ClInclude>
     <ClInclude Include="VkSwapChain.hpp">
-      <Filter>Header Files\vk</Filter>
+      <Filter>Header Files\Core</Filter>
     </ClInclude>
     <ClInclude Include="Block.hpp">
       <Filter>Header Files</Filter>
@@ -108,6 +108,12 @@
       <Filter>Header Files\Vendor</Filter>
     </ClInclude>
     <ClInclude Include="GameSounds.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameContext.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameVertex.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,31 +1,17 @@
 #pragma once
+
+#include "GameVertex.hpp"
+#include "GameContext.hpp"
+
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
 #include <vector>
 
-#include "VkDevice.hpp"
-
-struct Vertex {
-	glm::vec3 pos;
-	glm::vec3 color;
-	glm::vec3 normal;
-	glm::vec2 uv;
-};
-
 namespace Paddle {
-	union UpdateArgs {
-		int i;
-		float f;
-		double d;
-		glm::vec2 v2;
-		glm::vec3 v3;
-		glm::vec4 v4;
-	};
-
 	class GameEntity {
 	public:
-		GameEntity(Vk::Device& device);
+		GameEntity(GameContext &context);
 		virtual ~GameEntity();
 
 		GameEntity(const GameEntity&) = delete;
@@ -37,13 +23,13 @@ namespace Paddle {
 		glm::vec3 GetPosition() const { return position; }
 		glm::vec3 GetRotation() const { return rotation; }
 
-		virtual void Update(UpdateArgs args = UpdateArgs{}) {}
+		virtual void Update() {}
 		virtual void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet);
 
 		virtual bool CheckCollision(GameEntity* other) { return false; }
 
 	protected:
-		Vk::Device& device;
+		GameContext& context;
 		VkBuffer vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
 		VkBuffer indexBuffer;

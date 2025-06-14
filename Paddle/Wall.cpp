@@ -3,8 +3,8 @@
 #include <cstring>
 
 namespace Paddle {
-	Wall::Wall(Vk::Device& device, float x, float y, float z, glm::vec3 halfExtents)
-		: GameEntity(device), halfExtents(halfExtents) {
+	Wall::Wall(GameContext& context, float x, float y, float z, glm::vec3 halfExtents)
+		: GameEntity(context), halfExtents(halfExtents) {
 		verticesInstance = {
 			// Front face
 			{{-10.0f, -0.1f,  1.0f}, {0,0,0}, {0,0,1}, {0,0}},

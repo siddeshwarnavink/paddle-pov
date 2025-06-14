@@ -3,13 +3,13 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "VkDevice.hpp"
+#include "GameContext.hpp"
 #include "GameEntity.hpp"
 
 namespace Paddle {
 	class Wall : public GameEntity, public IBounded {
 	public:
-		Wall(Vk::Device& device, float x, float y, float z, glm::vec3 halfExtents);
+		Wall(GameContext& context, float x, float y, float z, glm::vec3 halfExtents);
 
 		Wall(const Wall&) = delete;
 		Wall& operator=(const Wall&) = delete;

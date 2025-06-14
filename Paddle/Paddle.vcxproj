@@ -149,9 +149,11 @@
     <ClInclude Include="Block.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="GameCamera.hpp" />
+    <ClInclude Include="GameContext.hpp" />
     <ClInclude Include="GameEntity.hpp" />
     <ClInclude Include="GameFont.hpp" />
     <ClInclude Include="GameSounds.hpp" />
+    <ClInclude Include="GameVertex.hpp" />
     <ClInclude Include="PlayerPaddle.hpp" />
     <ClInclude Include="Vendor\stb_truetype.h" />
     <ClInclude Include="VkDevice.hpp" />

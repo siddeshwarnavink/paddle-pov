@@ -1,12 +1,12 @@
 #include "PlayerPaddle.hpp"
 #include "VkDevice.hpp"
+
 #include <cstring>
 
 namespace Paddle {
 	const auto DEFAULT_POSITION = glm::vec3(5.5f, 0.0f, 0.0f);
 
-	PlayerPaddle::PlayerPaddle(Vk::Device& device)
-		: GameEntity(device)  {
+	PlayerPaddle::PlayerPaddle(GameContext& context) : GameEntity(context)  {
 		verticesInstance = {
 			// Front face
 			{{-0.001f, -0.25f,  0.075f}, {0,0,0}, {0,0,1}, {0,0}},

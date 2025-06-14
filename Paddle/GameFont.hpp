@@ -1,14 +1,15 @@
 #pragma once
+
 #include <glm/glm.hpp>
-#include <vector>
 #include <vulkan/vulkan.h>
 #include "Vendor\stb_truetype.h"
 
 #include "VkDevice.hpp"
 #include "VkPipeline.hpp"
 #include "VkSwapChain.hpp"
-#include "GameEntity.hpp"
+#include "GameVertex.hpp"
 
+#include <vector>
 #include <memory>
 #include <string>
 #include <unordered_map>

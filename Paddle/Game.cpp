@@ -1,4 +1,7 @@
 #include "Game.hpp"
+#include "GameSounds.hpp"
+#include "GameCamera.hpp"
+#include "GameFont.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
@@ -22,13 +25,20 @@ namespace Paddle
 
 	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV"),
 		device(window),
-		swapChain(device, window.getExtent()) {
-		camera = std::make_unique<GameCamera>();
-
-		CreateGameSounds();
+		swapChain(device, window.getExtent())
+	{
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
+
+		context = std::make_unique<GameContext>(
+			&device,
+			std::make_unique<GameSounds>(),
+			std::make_unique<GameFont>(device, descriptorPool, swapChain),
+			std::make_unique<GameCamera>(),
+			false,
+			0);
+
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
@@ -45,40 +55,34 @@ namespace Paddle
 		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
 	}
 
-	void Game::CreateGameSounds() {
-		gameSounds = std::make_unique<GameSounds>();
-		gameSounds->PlayBgm();
-	}
-
 	void Game::CreateGameEntities() {
-		Block::CreateBlocks(device, blocks);
-		ballEntity = std::make_unique<Ball>(device);
-		paddleEntity = std::make_unique<PlayerPaddle>(device);
+		Block::CreateBlocks(*context, blocks);
+		ballEntity = std::make_unique<Ball>(*context);
+		paddleEntity = std::make_unique<PlayerPaddle>(*context);
 
 		//
 		// Create walls
 		//
 		{
-			auto leftWall = std::make_unique<Wall>(device, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+			auto leftWall = std::make_unique<Wall>(*context, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
 			wallEntities.emplace_back(std::move(leftWall));
 
-			auto rightWall = std::make_unique<Wall>(device, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+			auto rightWall = std::make_unique<Wall>(*context, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
 			wallEntities.emplace_back(std::move(rightWall));
 
 			// Wall behind all the blocks
-			auto frontWall = std::make_unique<Wall>(device, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
+			auto frontWall = std::make_unique<Wall>(*context, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
 			wallEntities.emplace_back(std::move(frontWall));
 		}
 
 	}
 
 	void Game::CreateGameFont() {
-		font = std::make_unique<GameFont>(device, descriptorPool, swapChain);
-		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
-		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
-		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
-		font->AddText(FontFamily::FONT_FAMILY_BODY, "Bonus +69");
-		font->CreateVertexBuffer();
+		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
+		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
+		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
+		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Bonus +69");
+		context->font->CreateVertexBuffer();
 	}
 
 	void Game::UpdateAllEntitiesPosition(const glm::vec3& delta) {
@@ -100,19 +104,19 @@ namespace Paddle
 
 	void Game::ResetGame() {
 		ResetEntities();
-		score = 0;
-		gameOver = false;
+		context->score = 0;
+		context->gameOver = false;
 	}
 
 	void Game::ResetEntities() {
-		camera->Reset();
+		context->camera->Reset();
 		paddleEntity->Reset();
 		ballEntity->Reset();
 		for(auto& wall : wallEntities) wall->Reset();
 
 		blocks.clear();
 		pendingDeleteBlocks.clear();
-		Block::CreateBlocks(device, blocks);
+		Block::CreateBlocks(*context, blocks);
 	}
 
 	void Game::RenderScoreFont(std::string scoreText, std::string bonusText) {
@@ -127,14 +131,14 @@ namespace Paddle
 			float y = (-height / 2.0f) + paddingY;
 			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
-			font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
+			context->font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
 		}
 
 		if(bonusText.length() > 0) {
 			float scaleX = width / 1080;
 			float scaleY = height / 720;
 
-			font->AddText(FontFamily::FONT_FAMILY_BODY, bonusText, -50.0f * scaleX, -200.0f * scaleY, 0.25f * scaleX, glm::vec3(1.0f));
+			context->font->AddText(FontFamily::FONT_FAMILY_BODY, bonusText, -50.0f * scaleX, -200.0f * scaleY, 0.25f * scaleX, glm::vec3(1.0f));
 		}
 	}
 
@@ -145,20 +149,22 @@ namespace Paddle
 		float scaleX = width / 1080;
 		float scaleY = height / 720;
 
-		font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
-		font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, -80.0f * scaleX, 50.0f * scaleY, 0.75f * scaleX, glm::vec3(1.0f));
-		font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.", -153.0f * scaleX, 150.0f * scaleY, 0.25f * scaleX, glm::vec3(112.0f / 255.0f));
+		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
+		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, -80.0f * scaleX, 50.0f * scaleY, 0.75f * scaleX, glm::vec3(1.0f));
+		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.", -153.0f * scaleX, 150.0f * scaleY, 0.25f * scaleX, glm::vec3(112.0f / 255.0f));
 	}
 
 	void Game::run() {
 		srand(static_cast<unsigned int>(time(0)));
+
+		context->gameSounds->PlayBgm();
 
 		bool prevPlayPaddleCollisionSound = false;
 		bool prevF10Pressed = false;
 		bool prevGameOver = false;
 		int prevScore = -1;
 		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
-		score = 0;
+		context->score = 0;
 
 		bool waitingForBlockReset = false;
 		time_t blockResetTime = 0;
@@ -170,7 +176,7 @@ namespace Paddle
 
 		swapChain.recreate();
 		CreatePipeline();
-		font->CreatePipeline();
+		context->font->CreatePipeline();
 		CreateCommandBuffers();
 
 		while (!window.ShouldClose()) {
@@ -183,7 +189,7 @@ namespace Paddle
 				window.ToggleFullscreen();
 				swapChain.recreate();
 				CreatePipeline();
-				font->CreatePipeline();
+				context->font->CreatePipeline();
 				CreateCommandBuffers();
 			}
 
@@ -197,14 +203,9 @@ namespace Paddle
 			if (difftime(time(NULL), lastBonusMessage) > 3)
 				bonusText = "";
 
-			//
-			// Ball when behind paddle
-			//
-			if (ballEntity->GetPosition().x > 6.0f)
-				gameOver = true;
+			if (ballEntity->GetPosition().x > 6.0f) context->gameOver = true;
 
-			if (!gameOver)
-				ballEntity->Update({ score });
+			if (!context->gameOver) ballEntity->Update();
 
 			//
 			// Block Collision
@@ -226,7 +227,7 @@ namespace Paddle
 					if (blocks.empty() && !waitingForBlockReset) {
 						waitingForBlockReset = true;
 						blockResetTime = time(NULL);
-						gameSounds->PlaySfx(SFX_BLOCKS_RESET);
+						context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 					}
 				}
 				else if (!block->IsExplosionInitiated() && ballEntity->CheckCollision(block)) {
@@ -239,8 +240,8 @@ namespace Paddle
 
 					time(&lastCollision);
 
-					gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
-					score += 10;
+					context->gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
+					context->score += 10;
 				}
 				else ++it;
 			}
@@ -250,15 +251,15 @@ namespace Paddle
 			//
 			if(!didBlockCollide &&  streak_count > 0) {
 				const int bonusScore = ++streak_count * 10;
-				score += bonusScore;
+				context->score += bonusScore;
 				streak_count = 0;
 				time(&lastBonusMessage);
 
 				bonusText = "Bonus +" + std::to_string(bonusScore);
-				gameSounds->PlaySfx(SFX_BONUS);
+				context->gameSounds->PlaySfx(SFX_BONUS);
 			}
 
-			std::string scoreText = "Score: " + std::to_string(score);
+			std::string scoreText = "Score: " + std::to_string(context->score);
 
 			//
 			// Paddle Collision
@@ -270,7 +271,7 @@ namespace Paddle
 				ballEntity->OnCollision(paddle);
 
 				if(!prevPlayPaddleCollisionSound)
-					gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
+					context->gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
 				playPaddleCollisionSound = true;
 			}
 
@@ -282,14 +283,14 @@ namespace Paddle
 
 				if (ballEntity->CheckCollision(entity.get())) {
 					ballEntity->OnCollision(entity.get());
-					gameSounds->PlaySfx(SFX_WALL_BOUNCE);
+					context->gameSounds->PlaySfx(SFX_WALL_BOUNCE);
 				}
 			}
 
 			//
 			// Camera movement logic
 			//
-			if (!gameOver) {
+			if (!context->gameOver) {
 				glm::vec3 paddleDelta = glm::vec3(0.0f);
 
 				if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
@@ -315,23 +316,23 @@ namespace Paddle
 			//
 			// Font rendering
 			//
-			font->ClearText();
-			if (gameOver) {
+			context->font->ClearText();
+			if (context->gameOver) {
 				RenderGameOverFont(scoreText);
 
 				//
 				// Game over keybindings
 				//
 				if (window.IsKeyPressed(GLFW_KEY_SPACE)) {
-					gameSounds->PlayBgm();
-					gameSounds->PlaySfx(SFX_BLOCKS_RESET);
+					context->gameSounds->PlayBgm();
+					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 
 					ResetGame();
-					font->ClearText();
+					context->font->ClearText();
 					RenderScoreFont(scoreText, bonusText);
-					font->CreateVertexBuffer();
-					prevScore = score;
-					prevGameOver = gameOver;
+					context->font->CreateVertexBuffer();
+					prevScore = context->score;
+					prevGameOver = context->gameOver;
 					continue;
 				}
 				else if (window.IsKeyPressed(GLFW_KEY_ESCAPE)) {
@@ -342,16 +343,16 @@ namespace Paddle
 				RenderScoreFont(scoreText, bonusText);
 			}
 
-			font->CreateVertexBuffer();
+			context->font->CreateVertexBuffer();
 
-			if (prevScore != score || prevGameOver != gameOver || prevF10Pressed != f10Pressed) {
-				if (prevGameOver != gameOver) {
-					gameSounds->PauseBgm();
-					gameSounds->PlaySfx(SFX_GAME_OVER);
+			if (prevScore != context->score || prevGameOver != context->gameOver || prevF10Pressed != f10Pressed) {
+				if (prevGameOver != context->gameOver) {
+					context->gameSounds->PauseBgm();
+					context->gameSounds->PlaySfx(SFX_GAME_OVER);
 				}
 			}
-			prevScore = score;
-			prevGameOver = gameOver;
+			prevScore = context->score;
+			prevGameOver = context->gameOver;
 			prevF10Pressed = f10Pressed;
 			prevPlayPaddleCollisionSound = playPaddleCollisionSound;
 
@@ -440,7 +441,7 @@ namespace Paddle
 		VkCommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandPool = device.getCommandPool();
+		allocInfo.commandPool = context->device->getCommandPool();
 		allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
 		if (vkAllocateCommandBuffers(device.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
@@ -480,7 +481,7 @@ namespace Paddle
 				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			ballEntity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
-			font->Draw(commandBuffers[i]);
+			context->font->Draw(commandBuffers[i]);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -514,8 +515,8 @@ namespace Paddle
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
 		CameraUbo ubo{};
-		glm::vec3 camPos = camera->GetPosition();
-		glm::vec3 camTarget = camera->GetTarget();
+		glm::vec3 camPos = context->camera->GetPosition();
+		glm::vec3 camTarget = context->camera->GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
 		float aspect = float(swapChain.width()) / float(swapChain.height());
 		ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
@@ -603,7 +604,3 @@ namespace Paddle
 		}
 	}
 }
-
-// TODO: Cook up something for background (day-night cycle maybe?)
-// TODO: Adding power-ups (extra life, paddle machine gun?)
-// TODO: Blinking font effect support.

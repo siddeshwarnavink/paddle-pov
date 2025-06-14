@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <random>
+#include <algorithm>
 
 namespace Paddle {
 	static constexpr float BLOCK_SPACING = 0.65f;
@@ -14,7 +15,7 @@ namespace Paddle {
 	static constexpr float TNT_PROB     = 0.2f;
 	static constexpr float RAINBOW_PROB = 0.05f;
 
-	Block::Block(Vk::Device& device, float x, float y, float z, const glm::vec3& color) : GameEntity(device) {
+	Block::Block(GameContext& context, float x, float y, float z, const glm::vec3& color) : GameEntity(context) {
 		allBlocksRef = nullptr;
 
 		verticesInstance = {
@@ -64,7 +65,7 @@ namespace Paddle {
 		isExplosionInitiated = false;
 	}
 
-	void Block::CreateBlocks(Vk::Device& device, std::vector<std::unique_ptr<Block>>& blocks) {
+	void Block::CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks) {
 		const float startX = -BLOCK_SPACING * 2;
 		const float startY = -BLOCK_SPACING * 2;
 
@@ -84,12 +85,11 @@ namespace Paddle {
 				float x = startX + i * BLOCK_SPACING;
 				float y = startY + j * BLOCK_SPACING;
 				glm::vec3 color = colors[dis(gen)];
-				blocks.emplace_back(std::make_unique<Block>(device, x, y, 0.0f, color));
+				blocks.emplace_back(std::make_unique<Block>(context, x, y, 0.0f, color));
 			}
 		}
 
 		for (auto& block : blocks) block->SetAllBlocksRef(&blocks);
-
 	}
 
 	void Block::InitExplosion() {
@@ -118,6 +118,7 @@ namespace Paddle {
 
 				if (adjacentAxes == 1 && sameAxes == 2) {
 					otherBlockPtr->InitExplosion();
+					context.score += 10;
 				}
 			}
 		}
@@ -129,6 +130,7 @@ namespace Paddle {
 			for (auto& otherBlockPtr : *allBlocksRef) {
 				if (!otherBlockPtr || otherBlockPtr.get() == this) continue;
 				otherBlockPtr->InitExplosion();
+				context.score += 10;
 			}
 		}
 
@@ -153,7 +155,7 @@ namespace Paddle {
 		}
 	}
 
-	void Block::Update(UpdateArgs args) {
+	void Block::Update() {
 		if (!isExplosionInitiated || isExploded) return;
 
 		const float deltaTime = 0.01f;

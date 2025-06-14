@@ -1,17 +1,18 @@
 #include "GameEntity.hpp"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace Paddle {
-	GameEntity::GameEntity(Vk::Device& device) : device(device) {
+	GameEntity::GameEntity(GameContext& context) : context(context) {
 		position = glm::vec3(0.0f);
 		rotation = glm::vec3(0.0f);
 	}
 
 	GameEntity::~GameEntity() {
-		vkDestroyBuffer(device.device(), vertexBuffer, nullptr);
-		vkFreeMemory(device.device(), vertexBufferMemory, nullptr);
-		vkDestroyBuffer(device.device(), indexBuffer, nullptr);
-		vkFreeMemory(device.device(), indexBufferMemory, nullptr);
+		vkDestroyBuffer(context.device->device(), vertexBuffer, nullptr);
+		vkFreeMemory(context.device->device(), vertexBufferMemory, nullptr);
+		vkDestroyBuffer(context.device->device(), indexBuffer, nullptr);
+		vkFreeMemory(context.device->device(), indexBufferMemory, nullptr);
 	}
 
 	void GameEntity::InitialiseEntity() {
@@ -21,32 +22,32 @@ namespace Paddle {
 
 	void GameEntity::CreateVertexBuffer() {
 		VkDeviceSize bufferSize = sizeof(verticesInstance[0]) * verticesInstance.size();
-		device.createBuffer(
+		context.device->createBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			vertexBuffer,
 			vertexBufferMemory);
-		device.SetObjectName((uint64_t)vertexBuffer, VK_OBJECT_TYPE_BUFFER, "Block Vertex Buffer");
+		context.device->SetObjectName((uint64_t)vertexBuffer, VK_OBJECT_TYPE_BUFFER, "Block Vertex Buffer");
 		void* data;
-		vkMapMemory(device.device(), vertexBufferMemory, 0, bufferSize, 0, &data);
+		vkMapMemory(context.device->device(), vertexBufferMemory, 0, bufferSize, 0, &data);
 		memcpy(data, verticesInstance.data(), (size_t)bufferSize);
-		vkUnmapMemory(device.device(), vertexBufferMemory);
+		vkUnmapMemory(context.device->device(), vertexBufferMemory);
 	}
 
 	void GameEntity::CreateIndexBuffer() {
 		VkDeviceSize bufferSize = sizeof(indicesInstance[0]) * indicesInstance.size();
-		device.createBuffer(
+		context.device->createBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			indexBuffer,
 			indexBufferMemory);
-		device.SetObjectName((uint64_t)indexBuffer, VK_OBJECT_TYPE_BUFFER, "Block Index Buffer");
+		context.device->SetObjectName((uint64_t)indexBuffer, VK_OBJECT_TYPE_BUFFER, "Block Index Buffer");
 		void* data;
-		vkMapMemory(device.device(), indexBufferMemory, 0, bufferSize, 0, &data);
+		vkMapMemory(context.device->device(), indexBufferMemory, 0, bufferSize, 0, &data);
 		memcpy(data, indicesInstance.data(), (size_t)bufferSize);
-		vkUnmapMemory(device.device(), indexBufferMemory);
+		vkUnmapMemory(context.device->device(), indexBufferMemory);
 	}
 
 	void GameEntity::Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) {
