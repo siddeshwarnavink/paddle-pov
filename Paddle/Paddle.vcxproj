@@ -136,6 +136,7 @@
     <ClCompile Include="GameEntity.cpp" />
     <ClCompile Include="GameFont.cpp" />
     <ClCompile Include="GameSounds.cpp" />
+    <ClCompile Include="Loot.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PlayerPaddle.cpp" />
     <ClCompile Include="VkDevice.cpp" />
@@ -154,6 +155,7 @@
     <ClInclude Include="GameFont.hpp" />
     <ClInclude Include="GameSounds.hpp" />
     <ClInclude Include="GameVertex.hpp" />
+    <ClInclude Include="Loot.hpp" />
     <ClInclude Include="PlayerPaddle.hpp" />
     <ClInclude Include="Vendor\stb_truetype.h" />
     <ClInclude Include="VkDevice.hpp" />

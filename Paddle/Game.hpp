@@ -9,6 +9,7 @@
 #include "Ball.hpp"
 #include "GameFont.hpp"
 #include "GameContext.hpp"
+#include "Loot.hpp"
 
 #include <memory>
 #include <vector>
@@ -48,7 +49,7 @@ namespace Paddle {
 
 		// === Rendering ===
 		void DrawFrame();
-		void RenderScoreFont(std::string scoreText, std::string bonusText);
+		void RenderScoreFont(std::string scoreText, std::string livesText, std::string bonusText);
 		void RenderGameOverFont(std::string scoreText);
 
 		// === Window & Vulkan Core ===
@@ -70,6 +71,8 @@ namespace Paddle {
 		std::unique_ptr<Ball> ballEntity;
 		std::unique_ptr<PlayerPaddle> paddleEntity;
 		std::vector<std::unique_ptr<Wall>> wallEntities;
+		std::vector<std::unique_ptr<Loot>> lootEntities;
+		std::vector<std::unique_ptr<Loot>> pendingDeleteLoots;
 		std::vector<std::unique_ptr<Block>> blocks;
 		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
 	};

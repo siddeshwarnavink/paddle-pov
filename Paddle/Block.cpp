@@ -12,11 +12,13 @@
 namespace Paddle {
 	static constexpr float BLOCK_SPACING = 0.65f;
 
+	static constexpr float LOOT_PROB    = 0.2f;
 	static constexpr float TNT_PROB     = 0.2f;
 	static constexpr float RAINBOW_PROB = 0.05f;
 
 	Block::Block(GameContext& context, float x, float y, float z, const glm::vec3& color) : GameEntity(context) {
 		allBlocksRef = nullptr;
+		allLootsRef = nullptr;
 
 		verticesInstance = {
 			// Front face
@@ -65,7 +67,7 @@ namespace Paddle {
 		isExplosionInitiated = false;
 	}
 
-	void Block::CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks) {
+	void Block::CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks, std::vector<std::unique_ptr<Loot>>& loots) {
 		const float startX = -BLOCK_SPACING * 2;
 		const float startY = -BLOCK_SPACING * 2;
 
@@ -89,13 +91,29 @@ namespace Paddle {
 			}
 		}
 
-		for (auto& block : blocks) block->SetAllBlocksRef(&blocks);
+		for (auto& block : blocks) {
+			block->SetAllBlocksRef(&blocks);
+			block->SetAllLootsRef(&loots);
+		}
 	}
 
 	void Block::InitExplosion() {
 		if (isExplosionInitiated) return;
 		isExplosionInitiated = true;
 		explodedPieces.clear();
+
+		//
+		// Spawn Loot
+		//
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::bernoulli_distribution loot_dis(LOOT_PROB);
+
+		if(loot_dis(gen) && allLootsRef) {
+			const auto lootPosition = this->GetPosition();
+			auto loot = std::make_unique<Loot>(context, lootPosition.x, lootPosition.y, lootPosition.z);
+			allLootsRef->emplace_back(std::move(loot));
+		}
 
 		//
 		// TNT Block

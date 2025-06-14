@@ -18,18 +18,17 @@ struct GameContext {
 	// === Game state ===
 	bool gameOver;
 	int score;
+	int lives;
 
 	GameContext(Vk::Device* device,
 		std::unique_ptr<Paddle::GameSounds> gameSounds,
 		std::unique_ptr<Paddle::GameFont> font,
-		std::unique_ptr<Paddle::GameCamera> camera,
-		bool gameOver,
-		int score)
+		std::unique_ptr<Paddle::GameCamera> camera)
 		: device(std::move(device)),
 		gameSounds(std::move(gameSounds)),
 		font(std::move(font)),
 		camera(std::move(camera)),
-		gameOver(gameOver),
-		score(score) {
-	}
+		gameOver(false),
+		score(0),
+		lives(1) { }
 };

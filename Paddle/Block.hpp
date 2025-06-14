@@ -8,6 +8,7 @@
 
 #include "GameEntity.hpp"
 #include "Block.hpp"
+#include "Loot.hpp"
 
 namespace Paddle {
 	struct CubePiece {
@@ -28,7 +29,8 @@ namespace Paddle {
 		Block& operator=(const Block&) = delete;
 
 		void SetAllBlocksRef(std::vector<std::unique_ptr<Block>>* ref) { allBlocksRef = ref; } 
-		static void CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks);
+		void SetAllLootsRef(std::vector<std::unique_ptr<Loot>>* ref) { allLootsRef = ref; }
+		static void CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks, std::vector<std::unique_ptr<Loot>>& loots);
 
 		glm::vec3 GetHalfExtents() const override;
 		void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) override;
@@ -40,6 +42,7 @@ namespace Paddle {
 
 	private:
 		std::vector<std::unique_ptr<Block>>* allBlocksRef = nullptr;
+		std::vector<std::unique_ptr<Loot>>*allLootsRef = nullptr;
 		bool isTNTBlock;
 		bool isRainbowBlock;
 		bool isExploded;

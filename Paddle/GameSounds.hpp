@@ -9,7 +9,9 @@ namespace Paddle {
 		SFX_BLOCKS_RESET,
 		SFX_GAME_OVER,
 		SFX_BLOCK_EXPLOSION,
-		SFX_BONUS
+		SFX_BONUS,
+		SFX_LOOT_PICKUP,
+		SFX_LOOT_DENIED
 	};
 
 	class GameSounds {

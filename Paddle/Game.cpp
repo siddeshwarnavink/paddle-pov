@@ -35,9 +35,7 @@ namespace Paddle
 			&device,
 			std::make_unique<GameSounds>(),
 			std::make_unique<GameFont>(device, descriptorPool, swapChain),
-			std::make_unique<GameCamera>(),
-			false,
-			0);
+			std::make_unique<GameCamera>());
 
 		CreateDescriptorSet();
 		CreatePipelineLayout();
@@ -56,7 +54,7 @@ namespace Paddle
 	}
 
 	void Game::CreateGameEntities() {
-		Block::CreateBlocks(*context, blocks);
+		Block::CreateBlocks(*context, blocks, lootEntities);
 		ballEntity = std::make_unique<Ball>(*context);
 		paddleEntity = std::make_unique<PlayerPaddle>(*context);
 
@@ -74,11 +72,11 @@ namespace Paddle
 			auto frontWall = std::make_unique<Wall>(*context, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
 			wallEntities.emplace_back(std::move(frontWall));
 		}
-
 	}
 
 	void Game::CreateGameFont() {
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
+		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Lives: 1");
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
 		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
 		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Bonus +69");
@@ -100,6 +98,11 @@ namespace Paddle
 			auto pos = ballEntity->GetPosition();
 			ballEntity->SetPosition(pos + delta);
 		}
+
+		for (auto& loot : lootEntities) {
+			auto pos = loot->GetPosition();
+			loot->SetPosition(pos + delta);
+		}
 	}
 
 	void Game::ResetGame() {
@@ -114,12 +117,22 @@ namespace Paddle
 		ballEntity->Reset();
 		for(auto& wall : wallEntities) wall->Reset();
 
+		for (auto it = lootEntities.begin(); it != lootEntities.end(); ) {
+			pendingDeleteLoots.push_back(std::move(*it));
+			it = lootEntities.erase(it);
+		}
+		lootEntities.clear();
+
+		for (auto it = blocks.begin(); it != blocks.end(); ) {
+			pendingDeleteBlocks.push_back(std::move(*it));
+			it = blocks.erase(it);
+		}
 		blocks.clear();
-		pendingDeleteBlocks.clear();
-		Block::CreateBlocks(*context, blocks);
+
+		Block::CreateBlocks(*context, blocks, lootEntities);
 	}
 
-	void Game::RenderScoreFont(std::string scoreText, std::string bonusText) {
+	void Game::RenderScoreFont(std::string scoreText,std::string livesText, std::string bonusText) {
 		float width = static_cast<float>(swapChain.width());
 		float height = static_cast<float>(swapChain.height());
 
@@ -132,6 +145,17 @@ namespace Paddle
 			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
 			context->font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
+		}
+
+		{
+			float paddingX = 20.0f;
+			float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
+
+			float x = (-width / 2.0f) + paddingX;
+			float y = (-height / 2.3f) + paddingY;
+			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
+
+			context->font->AddText(FontFamily::FONT_FAMILY_TITLE, livesText, x, y, fontSize, glm::vec3(1.0f));
 		}
 
 		if(bonusText.length() > 0) {
@@ -173,6 +197,7 @@ namespace Paddle
 		time_t lastBonusMessage = time(NULL);
 		uint32_t streak_count = 0;
 		std::string bonusText = "";
+		std::string livesText = "";
 
 		swapChain.recreate();
 		CreatePipeline();
@@ -203,9 +228,35 @@ namespace Paddle
 			if (difftime(time(NULL), lastBonusMessage) > 3)
 				bonusText = "";
 
-			if (ballEntity->GetPosition().x > 6.0f) context->gameOver = true;
+			livesText = "Lives: " + std::to_string(context->lives);
+			if(context->lives <= 1) livesText = "";
 
-			if (!context->gameOver) ballEntity->Update();
+			//
+			// Destroy uncollected loot
+			//
+			for (auto it = lootEntities.begin(); it != lootEntities.end(); ) {
+				auto loot = (*it).get();
+				if (loot->GetPosition().x > 6.0f) {
+					pendingDeleteLoots.push_back(std::move(*it));
+					it = lootEntities.erase(it);
+				}
+				else ++it;
+			}
+
+			//
+			// Game over logic
+			//
+			if (ballEntity->GetPosition().x > 6.0f) {
+				if(--context->lives >= 1) {
+					ballEntity->Reset();
+					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
+				} else context->gameOver = true;
+			}
+
+			if (!context->gameOver) {
+				ballEntity->Update();
+				for (auto& loot : lootEntities) loot->Update();
+			}
 
 			//
 			// Block Collision
@@ -276,6 +327,19 @@ namespace Paddle
 			}
 
 			//
+			// Loot Collision
+			//
+			for (auto it = lootEntities.begin(); it != lootEntities.end(); ) {
+				auto loot = (*it).get();
+				if (loot->CheckCollision(paddle)) {
+					loot->OnCollision();
+					pendingDeleteLoots.push_back(std::move(*it));
+					it = lootEntities.erase(it);
+				}
+				else ++it;
+			}
+
+			//
 			// Wall collision
 			//
 			for (size_t i = 0; i < wallEntities.size(); ++i) {
@@ -329,7 +393,7 @@ namespace Paddle
 
 					ResetGame();
 					context->font->ClearText();
-					RenderScoreFont(scoreText, bonusText);
+					RenderScoreFont(scoreText, livesText, bonusText);
 					context->font->CreateVertexBuffer();
 					prevScore = context->score;
 					prevGameOver = context->gameOver;
@@ -340,7 +404,7 @@ namespace Paddle
 				}
 			}
 			else {
-				RenderScoreFont(scoreText, bonusText);
+				RenderScoreFont(scoreText, livesText, bonusText);
 			}
 
 			context->font->CreateVertexBuffer();
@@ -361,6 +425,7 @@ namespace Paddle
 		}
 		vkDeviceWaitIdle(device.device());
 		pendingDeleteBlocks.clear();
+		pendingDeleteLoots.clear();
 	}
 
 	void Game::CreatePipelineLayout() {
@@ -481,7 +546,12 @@ namespace Paddle
 				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			ballEntity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
+			
+			for (auto& loot : lootEntities)
+				loot->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
+
 			context->font->Draw(commandBuffers[i]);
+
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {

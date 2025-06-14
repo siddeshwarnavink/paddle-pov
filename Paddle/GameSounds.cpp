@@ -61,6 +61,12 @@ namespace Paddle {
 		case SFX_BONUS:
 			filename = "bonus.wav";
 			break;
+		case SFX_LOOT_PICKUP:
+			filename = "loot-pickup.mp3";
+			break;
+		case SFX_LOOT_DENIED:
+			filename = "loot-denied.mp3";
+			break;
 		default:
 			std::cerr << "unknown sound fx" << std::endl;
 			filename = "wall-bounce.mp3";
