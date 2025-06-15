@@ -6,6 +6,8 @@ namespace Paddle {
 	GameEntity::GameEntity(GameContext& context) : context(context) {
 		position = glm::vec3(0.0f);
 		rotation = glm::vec3(0.0f);
+
+		// InitialiseEntity() will be called by child classes
 	}
 
 	GameEntity::~GameEntity() {

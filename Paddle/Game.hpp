@@ -13,10 +13,19 @@
 
 #include <memory>
 #include <vector>
+#include <array>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace Paddle {
+	struct PendingDestroyEntity {
+		GameEntity* entity = nullptr;
+		uint64_t frameNumber;
+	};
+
+	static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
+
 	class Game {
 	public:
 		Game();
@@ -44,8 +53,15 @@ namespace Paddle {
 		// === Update / Logic ===
 		void UpdateUniformBuffer(uint32_t currentImage);
 		void UpdateAllEntitiesPosition(const glm::vec3& delta);
-		void ResetGame();
-		void ResetEntities();
+		void ResetGame(uint64_t currentFrame);
+		void ResetEntities(uint64_t currentFrame);
+
+		template <typename T>
+		void UpdateDestructionQueue(std::vector<T*>& entities, uint64_t currentFrame, bool deleteAll);
+		template <typename T>
+		void UpdateDestructionQueue(std::vector<T*>& entities, uint64_t currentFrame) {
+			UpdateDestructionQueue(entities, currentFrame, false);
+		}
 
 		// === Rendering ===
 		void DrawFrame();
@@ -59,6 +75,7 @@ namespace Paddle {
 		std::unique_ptr<Vk::Pipeline> pipeline;
 		VkPipelineLayout pipelineLayout;
 		std::vector<VkCommandBuffer> commandBuffers;
+		std::vector<PendingDestroyEntity> destructionQueue;
 
 		VkBuffer cameraUbo;
 		VkDeviceMemory cameraUboMemory;
@@ -68,13 +85,11 @@ namespace Paddle {
 
 		// === Game Components ===
 		std::unique_ptr<GameContext> context;
-		std::unique_ptr<Ball> ballEntity;
-		std::unique_ptr<PlayerPaddle> paddleEntity;
-		std::vector<std::unique_ptr<Wall>> wallEntities;
-		std::vector<std::unique_ptr<Loot>> lootEntities;
-		std::vector<std::unique_ptr<Loot>> pendingDeleteLoots;
-		std::vector<std::unique_ptr<Block>> blocks;
-		std::vector<std::unique_ptr<Block>> pendingDeleteBlocks;
+		std::unique_ptr<Ball> ball;
+		std::unique_ptr<PlayerPaddle> paddle;
+		std::array<Wall*, 3> walls;
+		std::vector<Block*> blocks;
+		std::vector<Loot*> loots;
 	};
 
 }

@@ -10,6 +10,8 @@
 #include <algorithm>
 
 namespace Paddle {
+	static constexpr int   BLOCK_ROWS    = 3;
+	static constexpr int   BLOCK_CoLs    = 8;
 	static constexpr float BLOCK_SPACING = 0.65f;
 
 	static constexpr float LOOT_PROB    = 0.2f;
@@ -67,7 +69,7 @@ namespace Paddle {
 		isExplosionInitiated = false;
 	}
 
-	void Block::CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks, std::vector<std::unique_ptr<Loot>>& loots) {
+	void Block::CreateBlocks(GameContext& context, std::vector<Block*>& blocks, std::vector<Loot*>& loots) {
 		const float startX = -BLOCK_SPACING * 2;
 		const float startY = -BLOCK_SPACING * 2;
 
@@ -82,12 +84,13 @@ namespace Paddle {
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
 
-		for (int i = 0; i < 3; ++i) {
-			for (int j = 0; j < 8; ++j) {
+		blocks.reserve(BLOCK_ROWS * BLOCK_CoLs);
+		for (int i = 0; i < BLOCK_ROWS; ++i) {
+			for (int j = 0; j < BLOCK_CoLs; ++j) {
 				float x = startX + i * BLOCK_SPACING;
 				float y = startY + j * BLOCK_SPACING;
 				glm::vec3 color = colors[dis(gen)];
-				blocks.emplace_back(std::make_unique<Block>(context, x, y, 0.0f, color));
+				blocks.emplace_back(new Block(context, x, y, 0.0f, color));
 			}
 		}
 
@@ -111,8 +114,8 @@ namespace Paddle {
 
 		if(loot_dis(gen) && allLootsRef) {
 			const auto lootPosition = this->GetPosition();
-			auto loot = std::make_unique<Loot>(context, lootPosition.x, lootPosition.y, lootPosition.z);
-			allLootsRef->emplace_back(std::move(loot));
+			auto loot = new Loot(context, lootPosition.x, lootPosition.y, lootPosition.z);
+			allLootsRef->emplace_back(loot);
 		}
 
 		//
@@ -120,7 +123,7 @@ namespace Paddle {
 		//
 		if (isTNTBlock && allBlocksRef) {
 			for (auto& otherBlockPtr : *allBlocksRef) {
-				if (!otherBlockPtr || otherBlockPtr.get() == this) continue;
+				if (otherBlockPtr == this) continue;
 
 				glm::vec3 otherPos = otherBlockPtr->GetPosition();
 				glm::vec3 thisPos = this->GetPosition();
@@ -146,7 +149,7 @@ namespace Paddle {
 		//
 		if (isRainbowBlock && allBlocksRef) {
 			for (auto& otherBlockPtr : *allBlocksRef) {
-				if (!otherBlockPtr || otherBlockPtr.get() == this) continue;
+				if (otherBlockPtr == this) continue;
 				otherBlockPtr->InitExplosion();
 				context.score += 10;
 			}

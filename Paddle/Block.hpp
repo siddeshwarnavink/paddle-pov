@@ -28,9 +28,9 @@ namespace Paddle {
 		Block(const Block&) = delete;
 		Block& operator=(const Block&) = delete;
 
-		void SetAllBlocksRef(std::vector<std::unique_ptr<Block>>* ref) { allBlocksRef = ref; } 
-		void SetAllLootsRef(std::vector<std::unique_ptr<Loot>>* ref) { allLootsRef = ref; }
-		static void CreateBlocks(GameContext& context, std::vector<std::unique_ptr<Block>>& blocks, std::vector<std::unique_ptr<Loot>>& loots);
+		void SetAllBlocksRef(std::vector<Block*>* ref) { allBlocksRef = ref; } 
+		void SetAllLootsRef(std::vector<Loot*>* ref) { allLootsRef = ref; }
+		static void CreateBlocks(GameContext& context, std::vector<Block*>& blocks, std::vector<Loot*>& loots);
 
 		glm::vec3 GetHalfExtents() const override;
 		void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet) override;
@@ -41,8 +41,8 @@ namespace Paddle {
 		bool IsExplosionInitiated() const { return isExplosionInitiated; }
 
 	private:
-		std::vector<std::unique_ptr<Block>>* allBlocksRef = nullptr;
-		std::vector<std::unique_ptr<Loot>>*allLootsRef = nullptr;
+		std::vector<Block*>* allBlocksRef = nullptr;
+		std::vector<Loot*>*allLootsRef = nullptr;
 		bool isTNTBlock;
 		bool isRainbowBlock;
 		bool isExploded;

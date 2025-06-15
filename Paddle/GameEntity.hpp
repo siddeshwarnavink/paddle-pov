@@ -17,6 +17,8 @@ namespace Paddle {
 		GameEntity(const GameEntity&) = delete;
 		GameEntity& operator=(const GameEntity&) = delete;
 
+		GameEntity* AsEntity() { return this; }
+
 		void SetPosition(const glm::vec3& pos) { position = pos; }
 		void SetRotation(const glm::vec3& rot) { rotation = rot; }
 
@@ -27,6 +29,9 @@ namespace Paddle {
 		virtual void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet);
 
 		virtual bool CheckCollision(GameEntity* other) { return false; }
+
+		void MarkForDestruction() { toBeDestroyed = true; }
+		bool IsMarkedForDestruction() const { return toBeDestroyed; }
 
 	protected:
 		GameContext& context;
@@ -43,6 +48,8 @@ namespace Paddle {
 		glm::vec3 rotation;
 
 	private:
+		bool toBeDestroyed = false;
+
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
 	};

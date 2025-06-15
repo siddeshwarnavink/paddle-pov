@@ -2,15 +2,15 @@
 #include "GameSounds.hpp"
 #include "GameCamera.hpp"
 #include "GameFont.hpp"
+#include "Utils.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
 #include <random>
-#include <iostream>
 #include <stdexcept>
 #include <array>
-#include <ctime> 
+#include <ctime>
 #include <cstdlib>
 
 namespace Paddle
@@ -45,6 +45,11 @@ namespace Paddle
 	}
 
 	Game::~Game() {
+		Utils::DebugLog("Game destructor called.");
+		Utils::DestroyPtrs<Block>(blocks);
+		Utils::DestroyPtrs<Loot> (loots);
+		Utils::DestroyPtrs<Wall> (walls);
+
 		vkFreeCommandBuffers(device.device(), device.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 		vkDestroyBuffer(device.device(), cameraUbo, nullptr);
 		vkFreeMemory(device.device(), cameraUboMemory, nullptr);
@@ -54,124 +59,118 @@ namespace Paddle
 	}
 
 	void Game::CreateGameEntities() {
-		Block::CreateBlocks(*context, blocks, lootEntities);
-		ballEntity = std::make_unique<Ball>(*context);
-		paddleEntity = std::make_unique<PlayerPaddle>(*context);
+		Block::CreateBlocks(*context, blocks, loots);
+		ball = std::make_unique<Ball>(*context);
+		paddle = std::make_unique<PlayerPaddle>(*context);
 
-		//
-		// Create walls
-		//
-		{
-			auto leftWall = std::make_unique<Wall>(*context, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
-			wallEntities.emplace_back(std::move(leftWall));
-
-			auto rightWall = std::make_unique<Wall>(*context, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
-			wallEntities.emplace_back(std::move(rightWall));
-
-			// Wall behind all the blocks
-			auto frontWall = std::make_unique<Wall>(*context, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
-			wallEntities.emplace_back(std::move(frontWall));
-		}
+		walls[0] = new Wall(*context, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+		walls[1] = new Wall(*context, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+		walls[2] = new Wall(*context, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
 	}
 
 	void Game::CreateGameFont() {
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Lives: 1");
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
-		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Press Space to restart. Esc to exit.");
-		context->font->AddText(FontFamily::FONT_FAMILY_BODY, "Bonus +69");
+		context->font->AddText(FontFamily::FONT_FAMILY_BODY,  "Press Space to restart. Esc to exit.");
+		context->font->AddText(FontFamily::FONT_FAMILY_BODY,  "Bonus +69");
 		context->font->CreateVertexBuffer();
 	}
 
-	void Game::UpdateAllEntitiesPosition(const glm::vec3& delta) {
-		for (auto& block : blocks) {
-			auto pos = block->GetPosition();
-			block->SetPosition(pos + delta);
-		}
-
-		for (auto& entity : wallEntities) {
-			auto pos = entity->GetPosition();
-			entity->SetPosition(pos + delta);
-		}
-
-		{
-			auto pos = ballEntity->GetPosition();
-			ballEntity->SetPosition(pos + delta);
-		}
-
-		for (auto& loot : lootEntities) {
-			auto pos = loot->GetPosition();
-			loot->SetPosition(pos + delta);
-		}
+	void EntityAddDeltaPos(GameEntity *entity, const glm::vec3& delta) {
+		const auto pos = entity->GetPosition();
+		entity->SetPosition(pos + delta);
 	}
 
-	void Game::ResetGame() {
-		ResetEntities();
+	void Game::UpdateAllEntitiesPosition(const glm::vec3& delta) {
+		for(auto& block : blocks) EntityAddDeltaPos(block->AsEntity(), delta);
+		for(auto& wall : walls)   EntityAddDeltaPos(wall->AsEntity(), delta);
+		for(auto& loot : loots)   EntityAddDeltaPos(loot->AsEntity(), delta);
+		EntityAddDeltaPos(ball->AsEntity(), delta);
+	}
+
+	void Game::ResetGame(uint64_t currentFrame) {
+		Utils::DebugLog("Resetting game state.");
+
+		ResetEntities(currentFrame);
 		context->score = 0;
 		context->gameOver = false;
 	}
 
-	void Game::ResetEntities() {
+	template <typename T>
+	void Game::UpdateDestructionQueue(std::vector<T*>& entities, uint64_t currentFrame, bool deleteAll) {
+		static_assert(std::is_base_of<GameEntity, T>::value, "T must be a GameEntity");
+
+		for(auto it = entities.begin(); it != entities.end(); ) {
+			GameEntity* entity = *it;
+
+			bool shouldDelete = entity->IsMarkedForDestruction();
+			if(deleteAll) shouldDelete = true;
+
+			if(shouldDelete) {
+				Utils::DebugLog(std::string(typeid(*entity).name()) + " marked for destruction");
+				PendingDestroyEntity pd{ entity->AsEntity(), currentFrame + MAX_FRAMES_IN_FLIGHT};
+				destructionQueue.push_back(pd);
+				it = entities.erase(it);
+			}
+			else ++it;
+		}
+	}
+
+	void Game::ResetEntities(uint64_t currentFrame) {
+		Utils::DebugLog("Resetting game entities.");
+
 		context->camera->Reset();
-		paddleEntity->Reset();
-		ballEntity->Reset();
-		for(auto& wall : wallEntities) wall->Reset();
+		paddle->Reset();
+		ball->Reset();
+		for(auto& wall : walls) wall->Reset();
 
-		for (auto it = lootEntities.begin(); it != lootEntities.end(); ) {
-			pendingDeleteLoots.push_back(std::move(*it));
-			it = lootEntities.erase(it);
-		}
-		lootEntities.clear();
+		UpdateDestructionQueue<Block>(blocks, currentFrame, true);
+		UpdateDestructionQueue<Loot> (loots, currentFrame, true);
 
-		for (auto it = blocks.begin(); it != blocks.end(); ) {
-			pendingDeleteBlocks.push_back(std::move(*it));
-			it = blocks.erase(it);
-		}
-		blocks.clear();
-
-		Block::CreateBlocks(*context, blocks, lootEntities);
+		Block::CreateBlocks(*context, blocks, loots);
 	}
 
 	void Game::RenderScoreFont(std::string scoreText,std::string livesText, std::string bonusText) {
-		float width = static_cast<float>(swapChain.width());
-		float height = static_cast<float>(swapChain.height());
+		const float width  = static_cast<float>(swapChain.width());
+		const float height = static_cast<float>(swapChain.height());
 
 		{
-			float paddingX = 20.0f;
-			float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
+			const float paddingX = 20.0f;
+			const float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
 
-			float x = (-width / 2.0f) + paddingX;
-			float y = (-height / 2.0f) + paddingY;
+			const float x = (-width / 2.0f)  + paddingX;
+			const float y = (-height / 2.0f) + paddingY;
 			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
 			context->font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, x, y, fontSize, glm::vec3(1.0f));
 		}
 
 		{
-			float paddingX = 20.0f;
-			float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
+			const float paddingX = 20.0f;
+			const float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
 
-			float x = (-width / 2.0f) + paddingX;
-			float y = (-height / 2.3f) + paddingY;
+			const float x = (-width / 2.0f)  + paddingX;
+			const float y = (-height / 2.3f) + paddingY;
 			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
 			context->font->AddText(FontFamily::FONT_FAMILY_TITLE, livesText, x, y, fontSize, glm::vec3(1.0f));
 		}
 
 		if(bonusText.length() > 0) {
-			float scaleX = width / 1080;
-			float scaleY = height / 720;
+			const float scaleX = width  / 1080;
+			const float scaleY = height / 720;
 
 			context->font->AddText(FontFamily::FONT_FAMILY_BODY, bonusText, -50.0f * scaleX, -200.0f * scaleY, 0.25f * scaleX, glm::vec3(1.0f));
 		}
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
-		float width = static_cast<float>(swapChain.width());
-		float height = static_cast<float>(swapChain.height());
+		const float width  = static_cast<float>(swapChain.width());
+		const float height = static_cast<float>(swapChain.height());
 
-		float scaleX = width / 1080;
-		float scaleY = height / 720;
+		const float scaleX = width  / 1080;
+		const float scaleY = height / 720;
 
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, scoreText, -80.0f * scaleX, 50.0f * scaleY, 0.75f * scaleX, glm::vec3(1.0f));
@@ -180,24 +179,26 @@ namespace Paddle
 
 	void Game::run() {
 		srand(static_cast<unsigned int>(time(0)));
+		uint64_t currentFrame = 0, absoluteFrameNumber = 0;
 
 		context->gameSounds->PlayBgm();
 
 		bool prevPlayPaddleCollisionSound = false;
-		bool prevF10Pressed = false;
-		bool prevGameOver = false;
-		int prevScore = -1;
-		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
+		bool prevF10Pressed               = false;
+		bool prevGameOver                 = false;
+		int prevScore                     = -1;
+		glm::vec3 paddleMoveDelta         = glm::vec3(0.0f);
+
 		context->score = 0;
 
 		bool waitingForBlockReset = false;
-		time_t blockResetTime = 0;
+		time_t blockResetTime     = 0;
 
-		time_t lastCollision = time(NULL);
+		time_t lastCollision    = time(NULL);
 		time_t lastBonusMessage = time(NULL);
-		uint32_t streak_count = 0;
-		std::string bonusText = "";
-		std::string livesText = "";
+		uint32_t streak_count   = 0;
+		std::string bonusText;
+		std::string livesText;
 
 		swapChain.recreate();
 		CreatePipeline();
@@ -206,6 +207,30 @@ namespace Paddle
 
 		while (!window.ShouldClose()) {
 			window.PollEvents();
+
+			//
+			// Cleanup pending destroys
+			//
+			currentFrame = absoluteFrameNumber % MAX_FRAMES_IN_FLIGHT;
+
+			for(auto it = destructionQueue.begin(); it != destructionQueue.end(); ) {
+				if(it->frameNumber <= absoluteFrameNumber) {
+					Utils::DebugLog("Destroying entity: " + std::string(typeid(*it->entity).name()));
+					delete it->entity;
+					it = destructionQueue.erase(it);
+				}
+				else ++it;
+			}
+
+			++absoluteFrameNumber;
+
+			// I know this takes 2 billion years to happen, but my
+			// game is soo good that this edge case should be handled.
+			if(absoluteFrameNumber > UINT64_MAX - 69420) {
+				std::cerr << "You played for too long! Thank you for playing!" << std::endl;
+				std::abort();
+			}
+
 			//
 			// Fullscreen/windowed toggle
 			//
@@ -219,8 +244,8 @@ namespace Paddle
 			}
 
 			if (waitingForBlockReset) {
-				if (difftime(time(NULL), blockResetTime) >= 1) { 
-					ResetEntities();
+				if (difftime(time(NULL), blockResetTime) >= 1) {
+					ResetEntities(currentFrame);
 					waitingForBlockReset = false;
 				}
 			}
@@ -234,67 +259,66 @@ namespace Paddle
 			//
 			// Destroy uncollected loot
 			//
-			for (auto it = lootEntities.begin(); it != lootEntities.end(); ) {
-				auto loot = (*it).get();
-				if (loot->GetPosition().x > 6.0f) {
-					pendingDeleteLoots.push_back(std::move(*it));
-					it = lootEntities.erase(it);
-				}
-				else ++it;
-			}
+			for (auto& loot : loots)
+				if (loot->GetPosition().x > 6.0f) loot->MarkForDestruction();
 
 			//
 			// Game over logic
 			//
-			if (ballEntity->GetPosition().x > 6.0f) {
+			if (ball->GetPosition().x > 6.0f) {
 				if(--context->lives >= 1) {
-					ballEntity->Reset();
+					ball->Reset();
 					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 				} else context->gameOver = true;
 			}
 
 			if (!context->gameOver) {
-				ballEntity->Update();
-				for (auto& loot : lootEntities) loot->Update();
+				ball->Update();
+				for (auto& loot : loots) loot->Update();
 			}
 
 			//
 			// Block Collision
 			//
 			bool didBlockCollide = false;
-
-			for (auto it = blocks.begin(); it != blocks.end(); ) {
-				auto block = (*it).get();
-
+			for (auto& block : blocks) {
 				block->Update();
 
 				if (block->IsExploded()) {
-					pendingDeleteBlocks.push_back(std::move(*it));
-					it = blocks.erase(it);
+					block->MarkForDestruction();
 
 					//
 					// Reset blocks
 					//
-					if (blocks.empty() && !waitingForBlockReset) {
+					bool isAllBlocksBroken = true;
+					for(auto& b : blocks) {
+						if(!b->IsMarkedForDestruction() || !b->IsExplosionInitiated()) {
+							isAllBlocksBroken = false;
+							break;
+						}
+					}
+
+					if(isAllBlocksBroken && !waitingForBlockReset) {
 						waitingForBlockReset = true;
 						blockResetTime = time(NULL);
 						context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 					}
 				}
-				else if (!block->IsExplosionInitiated() && ballEntity->CheckCollision(block)) {
+				else if (!block->IsExplosionInitiated() && ball->CheckCollision(block)) {
 					didBlockCollide = true;
-					ballEntity->OnCollision(block);
+					ball->OnCollision(block);
 					block->InitExplosion();
 
-					if(difftime(time(NULL), lastCollision) < 2)
-						streak_count++;
+					if (difftime(time(NULL), lastCollision) < 2) {
+						++streak_count;
+						Utils::DebugLog("Streak bonus: " + std::to_string(streak_count));
+					}
 
 					time(&lastCollision);
 
 					context->gameSounds->PlaySfx(SFX_BLOCK_EXPLOSION);
 					context->score += 10;
 				}
-				else ++it;
 			}
 
 			//
@@ -315,11 +339,10 @@ namespace Paddle
 			//
 			// Paddle Collision
 			//
-			GameEntity* paddle = paddleEntity.get();
 			bool playPaddleCollisionSound = false;
-
-			if (ballEntity->CheckCollision(paddle)) {
-				ballEntity->OnCollision(paddle);
+			if (ball->CheckCollision(paddle->AsEntity())) {
+				Utils::DebugLog("Ball collision with paddle detected.");
+				ball->OnCollision(paddle->AsEntity());
 
 				if(!prevPlayPaddleCollisionSound)
 					context->gameSounds->PlaySfx(SFX_PADDLE_BOUNCE);
@@ -329,24 +352,21 @@ namespace Paddle
 			//
 			// Loot Collision
 			//
-			for (auto it = lootEntities.begin(); it != lootEntities.end(); ) {
-				auto loot = (*it).get();
-				if (loot->CheckCollision(paddle)) {
+			for(auto& loot : loots) {
+				if(loot->CheckCollision(paddle->AsEntity())) {
+					Utils::DebugLog("Loot collision with paddle detected.");
 					loot->OnCollision();
-					pendingDeleteLoots.push_back(std::move(*it));
-					it = lootEntities.erase(it);
+					loot->MarkForDestruction();
 				}
-				else ++it;
 			}
 
 			//
 			// Wall collision
 			//
-			for (size_t i = 0; i < wallEntities.size(); ++i) {
-				auto& entity = wallEntities[i];
-
-				if (ballEntity->CheckCollision(entity.get())) {
-					ballEntity->OnCollision(entity.get());
+			for(auto& wall : walls) {
+				if (ball->CheckCollision(wall)) {
+					Utils::DebugLog("Ball collision with wall detected.");
+					ball->OnCollision(wall);
 					context->gameSounds->PlaySfx(SFX_WALL_BOUNCE);
 				}
 			}
@@ -366,8 +386,9 @@ namespace Paddle
 					UpdateAllEntitiesPosition(paddleDelta);
 
 					bool willCollide = false;
-					for (auto& entity : wallEntities) {
-						if (paddleEntity->CheckCollision(entity.get())) {
+					for(auto& wall : walls) {
+						if(paddle->CheckCollision(wall)) {
+							Utils::DebugLog("Paddle collision with wall detected.");
 							willCollide = true;
 							break;
 						}
@@ -391,7 +412,7 @@ namespace Paddle
 					context->gameSounds->PlayBgm();
 					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 
-					ResetGame();
+					ResetGame(currentFrame);
 					context->font->ClearText();
 					RenderScoreFont(scoreText, livesText, bonusText);
 					context->font->CreateVertexBuffer();
@@ -420,12 +441,16 @@ namespace Paddle
 			prevF10Pressed = f10Pressed;
 			prevPlayPaddleCollisionSound = playPaddleCollisionSound;
 
+			//
+			// Move entites to destruction queue
+			//
+			UpdateDestructionQueue<Block>(blocks, currentFrame);
+			UpdateDestructionQueue<Loot> (loots,  currentFrame);
+
 			CreateCommandBuffers();
 			DrawFrame();
 		}
 		vkDeviceWaitIdle(device.device());
-		pendingDeleteBlocks.clear();
-		pendingDeleteLoots.clear();
 	}
 
 	void Game::CreatePipelineLayout() {
@@ -545,9 +570,9 @@ namespace Paddle
 			for (auto& block : blocks)
 				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
-			ballEntity->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
-			
-			for (auto& loot : lootEntities)
+			ball->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
+
+			for (auto& loot : loots)
 				loot->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			context->font->Draw(commandBuffers[i]);
@@ -574,7 +599,7 @@ namespace Paddle
 	}
 
 	void Game::CreateUniformBuffer() {
-		VkDeviceSize bufferSize = sizeof(CameraUbo);
+		const VkDeviceSize bufferSize = sizeof(CameraUbo);
 		device.createBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
