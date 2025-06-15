@@ -13,6 +13,10 @@
 #include <ctime>
 #include <cstdlib>
 
+using Utils::DebugLog;
+using Utils::DestroyPtrs;
+using Utils::DestroyPtr;
+
 namespace Paddle
 {
 	static constexpr int WIDTH  = 1080;
@@ -23,19 +27,20 @@ namespace Paddle
 	static constexpr float WALL_LENGTH      = 10.0f;
 	static constexpr float WALL_SIDE_OFFSET = 3.0f;
 
-	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV"),
-		device(window),
-		swapChain(device, window.getExtent())
+	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV")
 	{
+		device    = new Vk::Device(window);
+		swapChain = new Vk::SwapChain(*device, window.getExtent());
+
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
 
-		context = std::make_unique<GameContext>(
-			&device,
-			std::make_unique<GameSounds>(),
-			std::make_unique<GameFont>(device, descriptorPool, swapChain),
-			std::make_unique<GameCamera>());
+		context = new GameContext(
+			device,
+			new GameSounds(),
+			new GameFont(*device, descriptorPool, *swapChain),
+			new GameCamera());
 
 		CreateDescriptorSet();
 		CreatePipelineLayout();
@@ -45,23 +50,38 @@ namespace Paddle
 	}
 
 	Game::~Game() {
-		Utils::DebugLog("Game destructor called.");
-		Utils::DestroyPtrs<Block>(blocks);
-		Utils::DestroyPtrs<Loot> (loots);
-		Utils::DestroyPtrs<Wall> (walls);
+		DebugLog("Destroying game entities.");
+		DestroyPtrs<Block> (blocks);
+		DestroyPtrs<Loot>  (loots);
+		DestroyPtrs<Wall>  (walls);
 
-		vkFreeCommandBuffers(device.device(), device.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
-		vkDestroyBuffer(device.device(), cameraUbo, nullptr);
-		vkFreeMemory(device.device(), cameraUboMemory, nullptr);
-		vkDestroyDescriptorPool(device.device(), descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
-		vkDestroyPipelineLayout(device.device(), pipelineLayout, nullptr);
+		DestroyPtr<Ball>         (ball);
+		DestroyPtr<PlayerPaddle> (paddle);
+
+		DebugLog("Destroying Vulkan resources.");
+		vkFreeCommandBuffers(device->device(), device->getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+		vkDestroyBuffer(device->device(), cameraUbo, nullptr);
+		vkFreeMemory(device->device(), cameraUboMemory, nullptr);
+		vkDestroyDescriptorPool(device->device(), descriptorPool, nullptr);
+		vkDestroyDescriptorSetLayout(device->device(), descriptorSetLayout, nullptr);
+		vkDestroyPipelineLayout(device->device(), pipelineLayout, nullptr);
+
+		DebugLog("Destroying game resources.");
+		DestroyPtr<GameSounds>  (context->gameSounds);
+		DestroyPtr<GameCamera>  (context->camera);
+		DestroyPtr<GameFont>    (context->font);
+		DestroyPtr<GameContext> (context);
+
+		DebugLog("Destroying Vulkan objects.");
+		DestroyPtr<Vk::Pipeline>  (pipeline);
+		DestroyPtr<Vk::SwapChain> (swapChain);
+		DestroyPtr<Vk::Device>    (device);
 	}
 
 	void Game::CreateGameEntities() {
 		Block::CreateBlocks(*context, blocks, loots);
-		ball = std::make_unique<Ball>(*context);
-		paddle = std::make_unique<PlayerPaddle>(*context);
+		ball   = new Ball(*context);
+		paddle = new PlayerPaddle(*context);
 
 		walls[0] = new Wall(*context, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
 		walls[1] = new Wall(*context, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
@@ -90,7 +110,7 @@ namespace Paddle
 	}
 
 	void Game::ResetGame(uint64_t currentFrame) {
-		Utils::DebugLog("Resetting game state.");
+		DebugLog("Resetting game state.");
 
 		ResetEntities(currentFrame);
 		context->score = 0;
@@ -108,7 +128,7 @@ namespace Paddle
 			if(deleteAll) shouldDelete = true;
 
 			if(shouldDelete) {
-				Utils::DebugLog(std::string(typeid(*entity).name()) + " marked for destruction");
+				DebugLog(std::string(typeid(*entity).name()) + " marked for destruction");
 				PendingDestroyEntity pd{ entity->AsEntity(), currentFrame + MAX_FRAMES_IN_FLIGHT};
 				destructionQueue.push_back(pd);
 				it = entities.erase(it);
@@ -118,7 +138,7 @@ namespace Paddle
 	}
 
 	void Game::ResetEntities(uint64_t currentFrame) {
-		Utils::DebugLog("Resetting game entities.");
+		DebugLog("Resetting game entities.");
 
 		context->camera->Reset();
 		paddle->Reset();
@@ -132,8 +152,8 @@ namespace Paddle
 	}
 
 	void Game::RenderScoreFont(std::string scoreText,std::string livesText, std::string bonusText) {
-		const float width  = static_cast<float>(swapChain.width());
-		const float height = static_cast<float>(swapChain.height());
+		const float width  = static_cast<float>(swapChain->width());
+		const float height = static_cast<float>(swapChain->height());
 
 		{
 			const float paddingX = 20.0f;
@@ -166,8 +186,8 @@ namespace Paddle
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
-		const float width  = static_cast<float>(swapChain.width());
-		const float height = static_cast<float>(swapChain.height());
+		const float width  = static_cast<float>(swapChain->width());
+		const float height = static_cast<float>(swapChain->height());
 
 		const float scaleX = width  / 1080;
 		const float scaleY = height / 720;
@@ -200,7 +220,7 @@ namespace Paddle
 		std::string bonusText;
 		std::string livesText;
 
-		swapChain.recreate();
+		swapChain->recreate();
 		CreatePipeline();
 		context->font->CreatePipeline();
 		CreateCommandBuffers();
@@ -215,7 +235,7 @@ namespace Paddle
 
 			for(auto it = destructionQueue.begin(); it != destructionQueue.end(); ) {
 				if(it->frameNumber <= absoluteFrameNumber) {
-					Utils::DebugLog("Destroying entity: " + std::string(typeid(*it->entity).name()));
+					DebugLog("Destroying entity: " + std::string(typeid(*it->entity).name()));
 					delete it->entity;
 					it = destructionQueue.erase(it);
 				}
@@ -237,7 +257,7 @@ namespace Paddle
 			bool f10Pressed = window.IsKeyPressed(GLFW_KEY_F10);
 			if (f10Pressed && !prevF10Pressed) {
 				window.ToggleFullscreen();
-				swapChain.recreate();
+				swapChain->recreate();
 				CreatePipeline();
 				context->font->CreatePipeline();
 				CreateCommandBuffers();
@@ -311,7 +331,7 @@ namespace Paddle
 
 					if (difftime(time(NULL), lastCollision) < 2) {
 						++streak_count;
-						Utils::DebugLog("Streak bonus: " + std::to_string(streak_count));
+						DebugLog("Streak bonus: " + std::to_string(streak_count));
 					}
 
 					time(&lastCollision);
@@ -341,7 +361,7 @@ namespace Paddle
 			//
 			bool playPaddleCollisionSound = false;
 			if (ball->CheckCollision(paddle->AsEntity())) {
-				Utils::DebugLog("Ball collision with paddle detected.");
+				DebugLog("Ball collision with paddle detected.");
 				ball->OnCollision(paddle->AsEntity());
 
 				if(!prevPlayPaddleCollisionSound)
@@ -354,7 +374,7 @@ namespace Paddle
 			//
 			for(auto& loot : loots) {
 				if(loot->CheckCollision(paddle->AsEntity())) {
-					Utils::DebugLog("Loot collision with paddle detected.");
+					DebugLog("Loot collision with paddle detected.");
 					loot->OnCollision();
 					loot->MarkForDestruction();
 				}
@@ -365,7 +385,7 @@ namespace Paddle
 			//
 			for(auto& wall : walls) {
 				if (ball->CheckCollision(wall)) {
-					Utils::DebugLog("Ball collision with wall detected.");
+					DebugLog("Ball collision with wall detected.");
 					ball->OnCollision(wall);
 					context->gameSounds->PlaySfx(SFX_WALL_BOUNCE);
 				}
@@ -388,7 +408,7 @@ namespace Paddle
 					bool willCollide = false;
 					for(auto& wall : walls) {
 						if(paddle->CheckCollision(wall)) {
-							Utils::DebugLog("Paddle collision with wall detected.");
+							DebugLog("Paddle collision with wall detected.");
 							willCollide = true;
 							break;
 						}
@@ -450,7 +470,7 @@ namespace Paddle
 			CreateCommandBuffers();
 			DrawFrame();
 		}
-		vkDeviceWaitIdle(device.device());
+		vkDeviceWaitIdle(device->device());
 	}
 
 	void Game::CreatePipelineLayout() {
@@ -466,7 +486,7 @@ namespace Paddle
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-		if (vkCreatePipelineLayout(device.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+		if (vkCreatePipelineLayout(device->device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
 		}
 	}
@@ -505,8 +525,10 @@ namespace Paddle
 	}
 
 	void Game::CreatePipeline() {
-		auto pipelineConfig = Vk::Pipeline::DefaultPipelineConfigInfo(swapChain.width(), swapChain.height());
-		pipelineConfig.renderPass = swapChain.getRenderPass();
+		DestroyPtr<Vk::Pipeline>(pipeline);
+
+		auto pipelineConfig = Vk::Pipeline::DefaultPipelineConfigInfo(swapChain->width(), swapChain->height());
+		pipelineConfig.renderPass = swapChain->getRenderPass();
 		pipelineConfig.pipelineLayout = pipelineLayout;
 
 		static auto bindingDescription = getBindingDescription();
@@ -518,15 +540,15 @@ namespace Paddle
 		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
 		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 		pipelineConfig.vertexInputInfo = vertexInputInfo;
-		pipeline = std::make_unique<Vk::Pipeline>(
-			device,
+		pipeline = new Vk::Pipeline(
+			*device,
 			"Shader\\shader.vert.spv",
 			"Shader\\shader.frag.spv",
 			pipelineConfig);
 	}
 
 	void Game::CreateCommandBuffers() {
-		commandBuffers.resize(swapChain.imageCount());
+		commandBuffers.resize(swapChain->imageCount());
 
 		VkCommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -534,7 +556,7 @@ namespace Paddle
 		allocInfo.commandPool = context->device->getCommandPool();
 		allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
-		if (vkAllocateCommandBuffers(device.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+		if (vkAllocateCommandBuffers(device->device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
 			throw std::runtime_error("failed to allocate command buffers");
 		}
 
@@ -548,11 +570,11 @@ namespace Paddle
 
 			VkRenderPassBeginInfo renderPassInfo{};
 			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			renderPassInfo.renderPass = swapChain.getRenderPass();
-			renderPassInfo.framebuffer = swapChain.getFrameBuffer(i);
+			renderPassInfo.renderPass = swapChain->getRenderPass();
+			renderPassInfo.framebuffer = swapChain->getFrameBuffer(i);
 
 			renderPassInfo.renderArea.offset = { 0, 0 };
-			renderPassInfo.renderArea.extent = swapChain.getSwapChainExtent();
+			renderPassInfo.renderArea.extent = swapChain->getSwapChainExtent();
 
 			std::array<VkClearValue, 2> clearValues{};
 			clearValues[0].color = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -587,12 +609,12 @@ namespace Paddle
 
 	void Game::DrawFrame() {
 		uint32_t imageIndex;
-		auto result = swapChain.acquireNextImage(&imageIndex);
+		auto result = swapChain->acquireNextImage(&imageIndex);
 		if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 			throw std::runtime_error("failed to acquire swap chain image");
 		}
 		UpdateUniformBuffer(imageIndex);
-		result = swapChain.submitCommandBuffers(&commandBuffers[imageIndex], &imageIndex);
+		result = swapChain->submitCommandBuffers(&commandBuffers[imageIndex], &imageIndex);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("failed to present swap chain image");
 		}
@@ -600,7 +622,7 @@ namespace Paddle
 
 	void Game::CreateUniformBuffer() {
 		const VkDeviceSize bufferSize = sizeof(CameraUbo);
-		device.createBuffer(
+		device->createBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -613,13 +635,13 @@ namespace Paddle
 		glm::vec3 camPos = context->camera->GetPosition();
 		glm::vec3 camTarget = context->camera->GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
-		float aspect = float(swapChain.width()) / float(swapChain.height());
+		float aspect = float(swapChain->width()) / float(swapChain->height());
 		ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;
 		void* data;
-		vkMapMemory(device.device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
+		vkMapMemory(device->device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
 		memcpy(data, &ubo, sizeof(ubo));
-		vkUnmapMemory(device.device(), cameraUboMemory);
+		vkUnmapMemory(device->device(), cameraUboMemory);
 	}
 
 	void Game::CreateDescriptorSet() {
@@ -629,7 +651,7 @@ namespace Paddle
 		allocInfo.descriptorSetCount = 1;
 		allocInfo.pSetLayouts = &descriptorSetLayout;
 
-		if (vkAllocateDescriptorSets(device.device(), &allocInfo, &cameraDescriptorSet) != VK_SUCCESS) {
+		if (vkAllocateDescriptorSets(device->device(), &allocInfo, &cameraDescriptorSet) != VK_SUCCESS) {
 			throw std::runtime_error("failed to allocate camera descriptor set!");
 		}
 
@@ -647,7 +669,7 @@ namespace Paddle
 		descriptorWriteUBO.descriptorCount = 1;
 		descriptorWriteUBO.pBufferInfo = &bufferInfo;
 
-		vkUpdateDescriptorSets(device.device(), 1, &descriptorWriteUBO, 0, nullptr);
+		vkUpdateDescriptorSets(device->device(), 1, &descriptorWriteUBO, 0, nullptr);
 	}
 
 	void Game::CreateDescriptorSetLayout() {
@@ -673,7 +695,7 @@ namespace Paddle
 		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 		layoutInfo.pBindings = bindings.data();
 
-		if (vkCreateDescriptorSetLayout(device.device(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+		if (vkCreateDescriptorSetLayout(device->device(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor set layout!");
 		}
 	}
@@ -694,7 +716,7 @@ namespace Paddle
 		poolInfo.pPoolSizes = poolSizes.data();
 		poolInfo.maxSets = static_cast<uint32_t>(numSets);
 
-		if (vkCreateDescriptorPool(device.device(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+		if (vkCreateDescriptorPool(device->device(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor pool");
 		}
 	}

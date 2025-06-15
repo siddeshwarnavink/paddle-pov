@@ -139,6 +139,7 @@
     <ClCompile Include="Loot.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PlayerPaddle.cpp" />
+    <ClCompile Include="Utils.cpp" />
     <ClCompile Include="VkDevice.cpp" />
     <ClCompile Include="VkPipeline.cpp" />
     <ClCompile Include="VkSwapChain.cpp" />

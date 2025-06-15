@@ -4,6 +4,10 @@
 #include <stdexcept>
 #include <cassert>
 
+#include "Utils.hpp"
+
+using Utils::DebugLog;
+
 namespace Vk
 {
 	Pipeline::Pipeline(Device& device, const std::string vertFilePath, const std::string fragFilePath, const PipelineConfigInfo& configInfo) : device{ device } {
@@ -12,9 +16,18 @@ namespace Vk
 
 	Pipeline::~Pipeline()
 	{
-		vkDestroyShaderModule(device.device(), vertShaderModule, nullptr);
-		vkDestroyShaderModule(device.device(), fragShaderModule, nullptr);
-		vkDestroyPipeline(device.device(), graphicsPipeline, nullptr);
+		DebugLog("Destroying graphics pipeline");
+		if(graphicsPipeline != VK_NULL_HANDLE)
+			vkDestroyPipeline(device.device(), graphicsPipeline, nullptr);
+		else DebugLog("graphicsPipeline is VK_NULL_HANDLE, nothing to destroy.");
+
+		if(vertShaderModule != VK_NULL_HANDLE)
+			vkDestroyShaderModule(device.device(), vertShaderModule, nullptr);
+		else DebugLog("vertShaderModule is VK_NULL_HANDLE, nothing to destroy.");
+
+		if(fragShaderModule != VK_NULL_HANDLE)
+			vkDestroyShaderModule(device.device(), fragShaderModule, nullptr);
+		else DebugLog("fragShaderModule is VK_NULL_HANDLE, nothing to destroy.");
 	}
 
 
@@ -48,7 +61,10 @@ namespace Vk
 		auto fragCode = ReadFile(fragFilePath);
 
 		CreateShaderModule(vertCode, &vertShaderModule);
+		device.SetObjectName((uint64_t)vertShaderModule, VK_OBJECT_TYPE_SHADER_MODULE, vertFilePath + " vertShaderModule");
+		
 		CreateShaderModule(fragCode, &fragShaderModule);
+		device.SetObjectName((uint64_t)fragShaderModule, VK_OBJECT_TYPE_SHADER_MODULE, fragFilePath + " fragShaderModule");
 
 		VkPipelineShaderStageCreateInfo shaderStages[2];
 		shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

@@ -10,7 +10,6 @@
 #include "GameVertex.hpp"
 
 #include <vector>
-#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -77,7 +76,7 @@ namespace Paddle {
 		VkDescriptorPool& descriptorPool;
 		VkDescriptorSetLayout descriptorSetLayout;
 		Vk::SwapChain& swapChain;
-		std::unique_ptr<Vk::Pipeline> fontPipeline;
+		Vk::Pipeline* fontPipeline = nullptr;
 		VkPipelineLayout fontPipelineLayout = VK_NULL_HANDLE;
 
 		int texWidth, texHeight;

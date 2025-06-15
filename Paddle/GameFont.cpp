@@ -2,6 +2,7 @@
 #include "GameCamera.hpp"
 #include "VkDevice.hpp"
 #include "VkPipeline.hpp"
+#include "Utils.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "Vendor\stb_truetype.h"
@@ -13,6 +14,9 @@
 #include <type_traits>
 #include <functional>
 #include <array>
+
+using Utils::DestroyPtr;
+using Utils::DebugLog;
 
 namespace Paddle {
 	GameFont::GameFont(Vk::Device& device, VkDescriptorPool& descriptorPool, Vk::SwapChain& swapChain)
@@ -30,30 +34,49 @@ namespace Paddle {
 	}
 
 	GameFont::~GameFont() {
+		DebugLog("Destroying GameFont resources.");
+
 		for (auto it = fontFilePath.begin(); it != fontFilePath.end(); ++it) {
 			FontFamilyData font = fontsTable[(*it).first];
 			if (font.vertexBuffer != VK_NULL_HANDLE)
 				vkDestroyBuffer(device.device(), font.vertexBuffer, nullptr);
+			else DebugLog("Font vertex buffer is null, skipping destruction.");
+
 			if (font.vertexBufferMemory != VK_NULL_HANDLE)
 				vkFreeMemory(device.device(), font.vertexBufferMemory, nullptr);
+			else DebugLog("Font vertex buffer memory is null, skipping destruction.");
+
 			if (font.stagingBuffer != VK_NULL_HANDLE)
 				vkDestroyBuffer(device.device(), font.stagingBuffer, nullptr);
+			else DebugLog("Font staging buffer is null, skipping destruction.");
+
 			if (font.stagingBufferMemory != VK_NULL_HANDLE)
 				vkFreeMemory(device.device(), font.stagingBufferMemory, nullptr);
+			else DebugLog("Font staging buffer memory is null, skipping destruction.");
+
 			if (font.fontImageView != VK_NULL_HANDLE)
 				vkDestroyImageView(device.device(), font.fontImageView, nullptr);
+			else DebugLog("Font image view is null, skipping destruction.");
+
 			if (font.fontImage != VK_NULL_HANDLE)
 				vkDestroyImage(device.device(), font.fontImage, nullptr);
+			else DebugLog("Font image is null, skipping destruction.");
+
 			if (font.fontImageMemory != VK_NULL_HANDLE)
 				vkFreeMemory(device.device(), font.fontImageMemory, nullptr);
+			else DebugLog("Font image memory is null, skipping destruction.");
+
 			if (font.fontSampler != VK_NULL_HANDLE)
 				vkDestroySampler(device.device(), font.fontSampler, nullptr);
+			else DebugLog("Font sampler is null, skipping destruction.");
+
 			delete[] font.bitmap;
 		}
 		if (fontPipelineLayout != VK_NULL_HANDLE)
 			vkDestroyPipelineLayout(device.device(), fontPipelineLayout, nullptr);
 		if (descriptorSetLayout != VK_NULL_HANDLE)
 			vkDestroyDescriptorSetLayout(device.device(), descriptorSetLayout, nullptr);
+		DestroyPtr(fontPipeline);
 	}
 
 	void GameFont::CreateFonts() {
@@ -337,6 +360,8 @@ namespace Paddle {
 	}
 
 	void GameFont::CreatePipeline() {
+		DestroyPtr<Vk::Pipeline>(fontPipeline);
+
 		auto pipelineConfig = Vk::Pipeline::DefaultPipelineConfigInfo(swapChain.width(), swapChain.height());
 		pipelineConfig.renderPass = swapChain.getRenderPass();
 		pipelineConfig.pipelineLayout = fontPipelineLayout;
@@ -352,7 +377,7 @@ namespace Paddle {
 
 		pipelineConfig.vertexInputInfo = vertexInputInfo;
 
-		fontPipeline = std::make_unique<Vk::Pipeline>(
+		fontPipeline = new Vk::Pipeline(
 			device,
 			"Shader\\font.vert.spv",
 			"Shader\\font.frag.spv",

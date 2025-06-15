@@ -3,10 +3,13 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 #include <limits>
 #include <set>
 #include <stdexcept>
+
+#include "Utils.hpp"
+
+using Utils::DebugLog;
 
 namespace Vk 
 {
@@ -375,19 +378,12 @@ namespace Vk
         const std::vector<VkPresentModeKHR>& availablePresentModes) {
         for (const auto& availablePresentMode : availablePresentModes) {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                std::cout << "Present mode: Mailbox" << std::endl;
+				DebugLog("Using Mailbox present mode for V-Sync.");
                 return availablePresentMode;
             }
         }
 
-        // for (const auto &availablePresentMode : availablePresentModes) {
-        //   if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-        //     std::cout << "Present mode: Immediate" << std::endl;
-        //     return availablePresentMode;
-        //   }
-        // }
-
-        std::cout << "Present mode: V-Sync" << std::endl;
+		DebugLog("Using FIFO present mode for V-Sync.");
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 

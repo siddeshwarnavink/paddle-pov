@@ -4,16 +4,14 @@
 #include "GameFont.hpp"
 #include "GameCamera.hpp"
 
-#include <memory>
-
 struct GameContext {
 	// === Vulkan ===
 	Vk::Device* device;
 
 	// === Game components ===
-	std::unique_ptr<Paddle::GameSounds> gameSounds;
-	std::unique_ptr<Paddle::GameFont> font;
-	std::unique_ptr<Paddle::GameCamera> camera;
+	Paddle::GameSounds* gameSounds;
+	Paddle::GameFont* font;
+	Paddle::GameCamera* camera;
 
 	// === Game state ===
 	bool gameOver;
@@ -21,14 +19,14 @@ struct GameContext {
 	int lives;
 
 	GameContext(Vk::Device* device,
-		std::unique_ptr<Paddle::GameSounds> gameSounds,
-		std::unique_ptr<Paddle::GameFont> font,
-		std::unique_ptr<Paddle::GameCamera> camera)
-		: device(std::move(device)),
-		gameSounds(std::move(gameSounds)),
-		font(std::move(font)),
-		camera(std::move(camera)),
-		gameOver(false),
-		score(0),
-		lives(1) { }
+		        Paddle::GameSounds* gameSounds,
+		        Paddle::GameFont* font,
+		        Paddle::GameCamera* camera)
+		: device(device),
+		  gameSounds(gameSounds),
+		  font(font),
+		  camera(camera),
+		  gameOver(false),
+		  score(0),
+		  lives(1) { }
 };

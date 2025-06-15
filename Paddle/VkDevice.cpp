@@ -1,9 +1,12 @@
 #include "VkDevice.hpp"
 
 #include <cstring>
-#include <iostream>
 #include <set>
 #include <unordered_set>
+
+#include "Utils.hpp"
+
+using Utils::DebugLog;
 
 namespace Vk {
 
@@ -12,8 +15,7 @@ namespace Vk {
 		VkDebugUtilsMessageTypeFlagsEXT messageType,
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData) {
-		std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-
+		DebugLog("validation layer: " + std::string(pCallbackData->pMessage));
 		return VK_FALSE;
 	}
 
@@ -56,6 +58,8 @@ namespace Vk {
 	}
 
 	Device::~Device() {
+		DebugLog("Device destructor called");
+
 		vkDestroyCommandPool(device_, commandPool, nullptr);
 		vkDestroyDevice(device_, nullptr);
 
@@ -114,7 +118,9 @@ namespace Vk {
 		if (deviceCount == 0) {
 			throw std::runtime_error("failed to find GPUs with Vulkan support!");
 		}
-		std::cout << "Device count: " << deviceCount << std::endl;
+
+		DebugLog("Device count: " + std::to_string(deviceCount));
+
 		std::vector<VkPhysicalDevice> devices(deviceCount);
 		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
@@ -130,7 +136,7 @@ namespace Vk {
 		}
 
 		vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-		std::cout << "physical device: " << properties.deviceName << std::endl;
+		DebugLog("Physical device: " + std::string(properties.deviceName));
 	}
 
 	void Device::createLogicalDevice() {
@@ -281,21 +287,27 @@ namespace Vk {
 		std::vector<VkExtensionProperties> extensions(extensionCount);
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-		std::cout << "available extensions:" << std::endl;
+		std::string availableExtensionsMsg = "available extensions: ";
 		std::unordered_set<std::string> available;
 		for (const auto& extension : extensions) {
-			std::cout << "\t" << extension.extensionName << std::endl;
+			availableExtensionsMsg += extension.extensionName;
+			availableExtensionsMsg += ", ";
+
 			available.insert(extension.extensionName);
 		}
+		DebugLog(availableExtensionsMsg);
 
-		std::cout << "required extensions:" << std::endl;
+		std::string requiredExtensionsMsg = "required extensions: ";
 		auto requiredExtensions = getRequiredExtensions();
 		for (const auto& required : requiredExtensions) {
-			std::cout << "\t" << required << std::endl;
+			requiredExtensionsMsg += required;
+			requiredExtensionsMsg += ", ";
+
 			if (available.find(required) == available.end()) {
 				throw std::runtime_error("Missing required glfw extension");
 			}
 		}
+		DebugLog(requiredExtensionsMsg);
 	}
 
 	bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device) {

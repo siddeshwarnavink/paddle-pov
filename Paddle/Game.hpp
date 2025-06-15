@@ -11,7 +11,6 @@
 #include "GameContext.hpp"
 #include "Loot.hpp"
 
-#include <memory>
 #include <vector>
 #include <array>
 #include <glm/glm.hpp>
@@ -70,9 +69,9 @@ namespace Paddle {
 
 		// === Window & Vulkan Core ===
 		Vk::Window window;
-		Vk::Device device;
-		Vk::SwapChain swapChain;
-		std::unique_ptr<Vk::Pipeline> pipeline;
+		Vk::Device* device;
+		Vk::SwapChain* swapChain;
+		Vk::Pipeline* pipeline;
 		VkPipelineLayout pipelineLayout;
 		std::vector<VkCommandBuffer> commandBuffers;
 		std::vector<PendingDestroyEntity> destructionQueue;
@@ -84,9 +83,9 @@ namespace Paddle {
 		VkDescriptorSet cameraDescriptorSet;
 
 		// === Game Components ===
-		std::unique_ptr<GameContext> context;
-		std::unique_ptr<Ball> ball;
-		std::unique_ptr<PlayerPaddle> paddle;
+		GameContext* context;
+		Ball* ball;
+		PlayerPaddle* paddle;
 		std::array<Wall*, 3> walls;
 		std::vector<Block*> blocks;
 		std::vector<Loot*> loots;
