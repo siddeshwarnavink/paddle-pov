@@ -3,6 +3,7 @@
 #include "GameCamera.hpp"
 #include "GameFont.hpp"
 #include "Utils.hpp"
+#include "FlashText.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
@@ -17,8 +18,7 @@ using Utils::DebugLog;
 using Utils::DestroyPtrs;
 using Utils::DestroyPtr;
 
-namespace Paddle
-{
+namespace Paddle {
 	static constexpr int WIDTH  = 1080;
 	static constexpr int HEIGHT = 720;
 
@@ -26,9 +26,11 @@ namespace Paddle
 
 	static constexpr float WALL_LENGTH      = 10.0f;
 	static constexpr float WALL_SIDE_OFFSET = 3.0f;
+	static constexpr float WALL_BEHIND_POS  = 6.0f;
 
-	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV")
-	{
+        static constexpr int BULLET_MAX_TIME = 5;
+
+	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV") {
 		device    = new Vk::Device(window);
 		swapChain = new Vk::SwapChain(*device, window.getExtent());
 
@@ -36,17 +38,20 @@ namespace Paddle
 		CreateUniformBuffer();
 		CreateDescriptorPool();
 
+                auto* font = new GameFont(*device, descriptorPool, *swapChain);
 		context = new GameContext(
 			device,
 			new GameSounds(),
-			new GameFont(*device, descriptorPool, *swapChain),
-			new GameCamera());
+                        font,
+			new GameCamera(),
+                        new FlashText(*font, *swapChain));
 
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
 		CreateGameEntities();
-		CreateGameFont();
+
+                font->CreateVertexBuffer();
 	}
 
 	Game::~Game() {
@@ -54,6 +59,7 @@ namespace Paddle
 		DestroyPtrs<Block> (blocks);
 		DestroyPtrs<Loot>  (loots);
 		DestroyPtrs<Wall>  (walls);
+		DestroyPtrs<Bullet>  (bullets);
 
 		DestroyPtr<Ball>         (ball);
 		DestroyPtr<PlayerPaddle> (paddle);
@@ -70,6 +76,7 @@ namespace Paddle
 		DestroyPtr<GameSounds>  (context->gameSounds);
 		DestroyPtr<GameCamera>  (context->camera);
 		DestroyPtr<GameFont>    (context->font);
+		DestroyPtr<FlashText>   (context->fm);
 		DestroyPtr<GameContext> (context);
 
 		DebugLog("Destroying Vulkan objects.");
@@ -88,24 +95,16 @@ namespace Paddle
 		walls[2] = new Wall(*context, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
 	}
 
-	void Game::CreateGameFont() {
-		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Score: 0");
-		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Lives: 1");
-		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over");
-		context->font->AddText(FontFamily::FONT_FAMILY_BODY,  "Press Space to restart. Esc to exit.");
-		context->font->AddText(FontFamily::FONT_FAMILY_BODY,  "Bonus +69");
-		context->font->CreateVertexBuffer();
-	}
-
 	void EntityAddDeltaPos(GameEntity *entity, const glm::vec3& delta) {
 		const auto pos = entity->GetPosition();
 		entity->SetPosition(pos + delta);
 	}
 
 	void Game::UpdateAllEntitiesPosition(const glm::vec3& delta) {
-		for(auto& block : blocks) EntityAddDeltaPos(block->AsEntity(), delta);
-		for(auto& wall : walls)   EntityAddDeltaPos(wall->AsEntity(), delta);
-		for(auto& loot : loots)   EntityAddDeltaPos(loot->AsEntity(), delta);
+		for(auto& block : blocks)   EntityAddDeltaPos(block->AsEntity(), delta);
+		for(auto& wall : walls)     EntityAddDeltaPos(wall->AsEntity(), delta);
+		for(auto& loot : loots)     EntityAddDeltaPos(loot->AsEntity(), delta);
+		for(auto& bullet : bullets) EntityAddDeltaPos(bullet->AsEntity(), delta);
 		EntityAddDeltaPos(ball->AsEntity(), delta);
 	}
 
@@ -145,13 +144,14 @@ namespace Paddle
 		ball->Reset();
 		for(auto& wall : walls) wall->Reset();
 
-		UpdateDestructionQueue<Block>(blocks, currentFrame, true);
-		UpdateDestructionQueue<Loot> (loots, currentFrame, true);
+		UpdateDestructionQueue<Block> (blocks, currentFrame, true);
+		UpdateDestructionQueue<Loot>  (loots, currentFrame, true);
+		UpdateDestructionQueue<Bullet>(bullets, currentFrame, true);
 
 		Block::CreateBlocks(*context, blocks, loots);
 	}
 
-	void Game::RenderScoreFont(std::string scoreText,std::string livesText, std::string bonusText) {
+	void Game::RenderScoreFont(std::string scoreText,std::string livesText) {
 		const float width  = static_cast<float>(swapChain->width());
 		const float height = static_cast<float>(swapChain->height());
 
@@ -177,12 +177,6 @@ namespace Paddle
 			context->font->AddText(FontFamily::FONT_FAMILY_TITLE, livesText, x, y, fontSize, glm::vec3(1.0f));
 		}
 
-		if(bonusText.length() > 0) {
-			const float scaleX = width  / 1080;
-			const float scaleY = height / 720;
-
-			context->font->AddText(FontFamily::FONT_FAMILY_BODY, bonusText, -50.0f * scaleX, -200.0f * scaleY, 0.25f * scaleX, glm::vec3(1.0f));
-		}
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
@@ -215,9 +209,7 @@ namespace Paddle
 		time_t blockResetTime     = 0;
 
 		time_t lastCollision    = time(NULL);
-		time_t lastBonusMessage = time(NULL);
 		uint32_t streak_count   = 0;
-		std::string bonusText;
 		std::string livesText;
 
 		swapChain->recreate();
@@ -227,6 +219,8 @@ namespace Paddle
 
 		while (!window.ShouldClose()) {
 			window.PollEvents();
+
+                        context->fm->Update();
 
 			//
 			// Cleanup pending destroys
@@ -247,7 +241,6 @@ namespace Paddle
 			// I know this takes 2 billion years to happen, but my
 			// game is soo good that this edge case should be handled.
 			if(absoluteFrameNumber > UINT64_MAX - 69420) {
-				std::cerr << "You played for too long! Thank you for playing!" << std::endl;
 				std::abort();
 			}
 
@@ -270,22 +263,28 @@ namespace Paddle
 				}
 			}
 
-			if (difftime(time(NULL), lastBonusMessage) > 3)
-				bonusText = "";
 
 			livesText = "Lives: " + std::to_string(context->lives);
 			if(context->lives <= 1) livesText = "";
+
+                        //
+                        // Check bullet timer
+                        //
+                        if(difftime(time(NULL), context->bulletResetTime) > BULLET_MAX_TIME) {
+                                context->bulletMode      = false;
+                                context->bulletResetTime = 0;
+                        }
 
 			//
 			// Destroy uncollected loot
 			//
 			for (auto& loot : loots)
-				if (loot->GetPosition().x > 6.0f) loot->MarkForDestruction();
+				if (loot->GetPosition().x > WALL_BEHIND_POS) loot->MarkForDestruction();
 
 			//
 			// Game over logic
 			//
-			if (ball->GetPosition().x > 6.0f) {
+			if (ball->GetPosition().x > WALL_BEHIND_POS) {
 				if(--context->lives >= 1) {
 					ball->Reset();
 					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
@@ -294,7 +293,8 @@ namespace Paddle
 
 			if (!context->gameOver) {
 				ball->Update();
-				for (auto& loot : loots) loot->Update();
+				for(auto& loot : loots)     loot->Update();
+				for(auto& bullet : bullets) bullet->Update();
 			}
 
 			//
@@ -302,8 +302,18 @@ namespace Paddle
 			//
 			bool didBlockCollide = false;
 			for (auto& block : blocks) {
-				block->Update();
+				block->Update(); 
 
+                                bool didBulletCollide = false;
+                                for(auto& bullet : bullets) {
+                                        if(bullet->CheckCollision(block)) {
+                                                DebugLog("Bullet collision with block detected");
+                                                didBulletCollide = true;
+                                                bullet->MarkForDestruction();
+                                                break;
+                                        }
+                                }
+                                                 
 				if (block->IsExploded()) {
 					block->MarkForDestruction();
 
@@ -324,7 +334,7 @@ namespace Paddle
 						context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 					}
 				}
-				else if (!block->IsExplosionInitiated() && ball->CheckCollision(block)) {
+				else if (!block->IsExplosionInitiated() && (ball->CheckCollision(block) || didBulletCollide)) {
 					didBlockCollide = true;
 					ball->OnCollision(block);
 					block->InitExplosion();
@@ -348,9 +358,8 @@ namespace Paddle
 				const int bonusScore = ++streak_count * 10;
 				context->score += bonusScore;
 				streak_count = 0;
-				time(&lastBonusMessage);
 
-				bonusText = "Bonus +" + std::to_string(bonusScore);
+                                context->fm->Flash("Bonus +" + std::to_string(bonusScore));
 				context->gameSounds->PlaySfx(SFX_BONUS);
 			}
 
@@ -384,6 +393,13 @@ namespace Paddle
 			// Wall collision
 			//
 			for(auto& wall : walls) {
+                                for(auto& bullet : bullets) {
+                                        if(bullet->CheckCollision(wall)) {
+                                                DebugLog("Bullet collision with wall detected");
+                                                bullet->MarkForDestruction();
+                                        }
+                                }
+
 				if (ball->CheckCollision(wall)) {
 					DebugLog("Ball collision with wall detected.");
 					ball->OnCollision(wall);
@@ -418,6 +434,17 @@ namespace Paddle
 				}
 			}
 
+
+                        //
+                        // Draw bullet
+                        //
+                        if(context->bulletMode && absoluteFrameNumber % 10 == 0) {
+                                auto pos = paddle->GetPosition();
+                                auto bullet = new Bullet(*context, pos.x, pos.y, pos.z);
+                                bullets.emplace_back(bullet);
+                        }
+
+
 			//
 			// Font rendering
 			//
@@ -434,7 +461,8 @@ namespace Paddle
 
 					ResetGame(currentFrame);
 					context->font->ClearText();
-					RenderScoreFont(scoreText, livesText, bonusText);
+					RenderScoreFont(scoreText, livesText);
+                                        context->fm->Draw();
 					context->font->CreateVertexBuffer();
 					prevScore = context->score;
 					prevGameOver = context->gameOver;
@@ -445,7 +473,8 @@ namespace Paddle
 				}
 			}
 			else {
-				RenderScoreFont(scoreText, livesText, bonusText);
+				RenderScoreFont(scoreText, livesText);
+                                context->fm->Draw();
 			}
 
 			context->font->CreateVertexBuffer();
@@ -464,12 +493,14 @@ namespace Paddle
 			//
 			// Move entites to destruction queue
 			//
-			UpdateDestructionQueue<Block>(blocks, currentFrame);
-			UpdateDestructionQueue<Loot> (loots,  currentFrame);
+			UpdateDestructionQueue<Block>  (blocks, currentFrame);
+			UpdateDestructionQueue<Loot>   (loots,  currentFrame);
+			UpdateDestructionQueue<Bullet> (bullets, currentFrame);
 
 			CreateCommandBuffers();
 			DrawFrame();
 		}
+
 		vkDeviceWaitIdle(device->device());
 	}
 
@@ -597,8 +628,10 @@ namespace Paddle
 			for (auto& loot : loots)
 				loot->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
-			context->font->Draw(commandBuffers[i]);
+                        for (auto& bullet : bullets)
+                                bullet->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
+			context->font->Draw(commandBuffers[i]);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {

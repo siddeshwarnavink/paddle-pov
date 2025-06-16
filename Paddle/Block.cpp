@@ -6,8 +6,11 @@
 #include <glm/gtc/epsilon.hpp>
 
 #include <cstring>
-#include <random>
-#include <algorithm>
+
+#include "Utils.hpp"
+
+using Utils::RandomChance;
+using Utils::RandomNumber;
 
 namespace Paddle {
 	static constexpr int   BLOCK_ROWS    = 3;
@@ -45,16 +48,11 @@ namespace Paddle {
 
 		glm::vec3 applyColor = color;
 
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::bernoulli_distribution tnt_dis(TNT_PROB);
-		std::bernoulli_distribution rainbow_dis(RAINBOW_PROB);
-
-		isTNTBlock = tnt_dis(gen);
+		isTNTBlock = RandomChance(TNT_PROB);
 		if(isTNTBlock)
 			applyColor = glm::vec3(0.0f);
 
-		isRainbowBlock = rainbow_dis(gen);
+		isRainbowBlock = RandomChance(RAINBOW_PROB);
 		if (isRainbowBlock) {
 			applyColor = glm::vec3(1.0f, 0.0f, 1.0f);
 			isTNTBlock = false;
@@ -80,16 +78,14 @@ namespace Paddle {
 			{179.0f / 255.0f, 240.0f / 255.0f, 255.0f / 255.0f}, // #b3f0ff
 			{30.0f / 255.0f, 151.0f / 255.0f, 158.0f / 255.0f},  // #1e979e
 		};
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> dis(0, static_cast<int>(colors.size()) - 1);
+		const int random = RandomNumber(0, static_cast<int>(colors.size()) - 1);
 
 		blocks.reserve(BLOCK_ROWS * BLOCK_CoLs);
-		for (int i = 0; i < BLOCK_ROWS; ++i) {
-			for (int j = 0; j < BLOCK_CoLs; ++j) {
-				float x = startX + i * BLOCK_SPACING;
-				float y = startY + j * BLOCK_SPACING;
-				glm::vec3 color = colors[dis(gen)];
+		for (size_t i = 0; i < BLOCK_ROWS; ++i) {
+			for (size_t j = 0; j < BLOCK_CoLs; ++j) {
+				const float x = startX + i * BLOCK_SPACING;
+				const float y = startY + j * BLOCK_SPACING;
+				glm::vec3 color = colors[random];
 				blocks.emplace_back(new Block(context, x, y, 0.0f, color));
 			}
 		}
@@ -108,11 +104,7 @@ namespace Paddle {
 		//
 		// Spawn Loot
 		//
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::bernoulli_distribution loot_dis(LOOT_PROB);
-
-		if(loot_dis(gen) && allLootsRef) {
+		if(RandomChance(LOOT_PROB) && allLootsRef) {
 			const auto lootPosition = this->GetPosition();
 			auto loot = new Loot(context, lootPosition.x, lootPosition.y, lootPosition.z);
 			allLootsRef->emplace_back(loot);

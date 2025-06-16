@@ -10,6 +10,7 @@
 #include "GameFont.hpp"
 #include "GameContext.hpp"
 #include "Loot.hpp"
+#include "Bullet.hpp"
 
 #include <vector>
 #include <array>
@@ -38,7 +39,6 @@ namespace Paddle {
 	private:
 		// === Initialization ===
 		void CreateGameEntities();
-		void CreateGameFont();
 		void CreatePipelineLayout();
 		void CreatePipeline();
 		void CreateCommandBuffers();
@@ -64,7 +64,7 @@ namespace Paddle {
 
 		// === Rendering ===
 		void DrawFrame();
-		void RenderScoreFont(std::string scoreText, std::string livesText, std::string bonusText);
+		void RenderScoreFont(std::string scoreText, std::string livesText);
 		void RenderGameOverFont(std::string scoreText);
 
 		// === Window & Vulkan Core ===
@@ -88,6 +88,7 @@ namespace Paddle {
 		PlayerPaddle* paddle;
 		std::array<Wall*, 3> walls;
 		std::vector<Block*> blocks;
+		std::vector<Bullet*> bullets;
 		std::vector<Loot*> loots;
 	};
 

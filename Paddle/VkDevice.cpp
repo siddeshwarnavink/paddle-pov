@@ -3,6 +3,7 @@
 #include <cstring>
 #include <set>
 #include <unordered_set>
+#include <stdexcept>
 
 #include "Utils.hpp"
 

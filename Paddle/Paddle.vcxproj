@@ -131,6 +131,8 @@
   <ItemGroup>
     <ClCompile Include="Ball.cpp" />
     <ClCompile Include="Block.cpp" />
+    <ClCompile Include="Bullet.cpp" />
+    <ClCompile Include="FlashText.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameCamera.cpp" />
     <ClCompile Include="GameEntity.cpp" />
@@ -149,6 +151,8 @@
   <ItemGroup>
     <ClInclude Include="Ball.hpp" />
     <ClInclude Include="Block.hpp" />
+    <ClInclude Include="Bullet.hpp" />
+    <ClInclude Include="FlashText.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="GameCamera.hpp" />
     <ClInclude Include="GameContext.hpp" />

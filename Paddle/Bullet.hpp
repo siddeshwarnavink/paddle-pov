@@ -7,12 +7,12 @@
 #include "GameEntity.hpp"
 
 namespace Paddle {
-	class Loot : public GameEntity, public IBounded {
+	class Bullet : public GameEntity, public IBounded {
 	public:
-		Loot(GameContext& context, float x, float y, float z);
+		Bullet(GameContext& context, float x, float y, float z);
 
-		Loot(const Loot&) = delete;
-		Loot& operator=(const Loot&) = delete;
+		Bullet(const Bullet&) = delete;
+		Bullet& operator=(const Bullet&) = delete;
 
 		glm::vec3 GetHalfExtents() const override;
 		bool CheckCollision(GameEntity* other) override;
@@ -21,11 +21,7 @@ namespace Paddle {
 		glm::vec3 GetVelocity() { return velocity; }
 		void SetVelocity(glm::vec3 updatedVelocity) { velocity = updatedVelocity; }
 
-		void OnCollision();
-
 	private:
 		glm::vec3 velocity;
-                bool isLifeLoot;
-                bool isBulletLoot;
 	};
 }

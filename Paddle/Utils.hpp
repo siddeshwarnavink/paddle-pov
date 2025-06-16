@@ -1,7 +1,7 @@
 #pragma once
 
-#include <iostream>
 #include <vector>
+#include <string>
 
 namespace Utils {
 	// This cursed syntax is to avoid double deletion
@@ -28,4 +28,8 @@ namespace Utils {
     }
 
 	void DebugLog(const std::string& message);
+
+    bool RandomChance(float prob);
+
+    int RandomNumber(int start, int end);
 }
