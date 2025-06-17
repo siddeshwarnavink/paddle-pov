@@ -50,7 +50,7 @@ namespace Paddle {
 
 	void Bullet::Update() {
 		glm::vec3 pos = GetPosition();
-		const float speedDelta = -0.5f;
+		const float speedDelta = -1.0f;
 
 		pos += velocity * speedDelta;
 		SetPosition(pos);

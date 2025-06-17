@@ -25,7 +25,6 @@ namespace Paddle {
 		}
 	};
 
-
 	struct FontFamilyData {
 		// --- Font metadata ---
 		std::string filePath;

@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <memory>
+#include <ctime>
 
 #include "GameEntity.hpp"
 #include "Block.hpp"
@@ -41,6 +42,7 @@ namespace Paddle {
 		bool IsExplosionInitiated() const { return isExplosionInitiated; }
 
 	private:
+		time_t lastColoChangeTime;
 		std::vector<Block*>* allBlocksRef = nullptr;
 		std::vector<Loot*>*allLootsRef = nullptr;
 		bool isTNTBlock;

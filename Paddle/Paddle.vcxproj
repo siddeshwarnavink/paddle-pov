@@ -163,7 +163,9 @@
     <ClInclude Include="Loot.hpp" />
     <ClInclude Include="PlayerPaddle.hpp" />
     <ClInclude Include="Utils.hpp" />
+    <ClInclude Include="Vendor\miniaudio.h" />
     <ClInclude Include="Vendor\stb_truetype.h" />
+    <ClInclude Include="Vendor\tiny_obj_loader.h" />
     <ClInclude Include="VkDevice.hpp" />
     <ClInclude Include="VkPipeline.hpp" />
     <ClInclude Include="VkSwapChain.hpp" />

@@ -11,7 +11,8 @@ namespace Paddle {
 		SFX_BLOCK_EXPLOSION,
 		SFX_BONUS,
 		SFX_LOOT_PICKUP,
-		SFX_LOOT_DENIED
+		SFX_LOOT_DENIED,
+                SFX_BULLET
 	};
 
 	class GameSounds {
@@ -22,9 +23,13 @@ namespace Paddle {
 		void PlaySfx(GameSoundsSfx sfx);
 		void PauseBgm();
 		void PlayBgm();
+                void StopSfx(GameSoundsSfx sfx);
 
 	private:
 		ma_engine engine;
 		ma_sound bgm;
-	};
+
+                ma_sound bulletSound;
+                bool bulletSoundInitialized = false;
+        };
 }

@@ -27,6 +27,8 @@ namespace Paddle {
 	}
 
 	GameSounds::~GameSounds() {
+                if(bulletSoundInitialized) ma_sound_uninit(&bulletSound);
+
 		ma_sound_uninit(&bgm);
 		ma_engine_uninit(&engine);
 	}
@@ -43,6 +45,20 @@ namespace Paddle {
 		std::string filename;
 
 		switch (sfx) {
+                case SFX_BULLET: {
+                        if (!bulletSoundInitialized) {
+                            std::string fullPath = prefix + "bullet.wav";
+                            ma_result result = ma_sound_init_from_file(&engine, fullPath.c_str(), 0, NULL, NULL, &bulletSound);
+                            if (result != MA_SUCCESS) {
+                                std::cerr << "Failed to load bullet sound\n";
+                                return;
+                            }
+                            bulletSoundInitialized = true;
+                            ma_sound_set_looping(&bulletSound, MA_TRUE); // Loop while active
+                        }
+                        ma_sound_start(&bulletSound);
+                        return;
+                }
 		case SFX_PADDLE_BOUNCE:
 			filename = "paddle-bounce.mp3";
 			break;
@@ -62,7 +78,7 @@ namespace Paddle {
 			filename = "bonus.wav";
 			break;
 		case SFX_LOOT_PICKUP:
-			filename = "loot-pickup.mp3";
+			filename = "loot-pickup.wav";
 			break;
 		case SFX_LOOT_DENIED:
 			filename = "loot-denied.mp3";
@@ -76,4 +92,15 @@ namespace Paddle {
 		std::string fullPath = prefix + filename;
 		ma_engine_play_sound(&engine, fullPath.c_str(), NULL);
 	}
+
+        void GameSounds::StopSfx(GameSoundsSfx sfx) {
+                switch (sfx) {
+                        case SFX_BULLET:
+                                if (bulletSoundInitialized) ma_sound_stop(&bulletSound);
+                                break;
+                        default:
+                                std::cerr << "StopSfx not implemented for this sound effect\n";
+                                break;
+                }
+        }
 }

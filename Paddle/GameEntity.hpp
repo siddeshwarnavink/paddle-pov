@@ -25,6 +25,9 @@ namespace Paddle {
 		glm::vec3 GetPosition() const { return position; }
 		glm::vec3 GetRotation() const { return rotation; }
 
+		void SetScale(const glm::vec3& s) { scale = s; }
+		void SetTintColor(const glm::vec4& color) { tintColor = color; }
+
 		virtual void Update() {}
 		virtual void Draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, VkDescriptorSet descriptorSet);
 
@@ -43,7 +46,11 @@ namespace Paddle {
 		std::vector<uint32_t> indicesInstance;
 
 		void InitialiseEntity();
+		void LoadModel(std::string path);
+		void UpdateVertexColors(const glm::vec4& color);
 
+		glm::vec3 scale = glm::vec3(1.0f);
+		glm::vec4 tintColor = glm::vec4(1.0f);
 		glm::vec3 position;
 		glm::vec3 rotation;
 

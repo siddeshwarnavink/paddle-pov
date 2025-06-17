@@ -1,3 +1,8 @@
+Texture
+==========
+
+https://free3d.com/3d-model/lego-brick-8x2-60034.html
+
 Font
 ==========
 
@@ -12,3 +17,4 @@ https://www.sounds-resource.com/mobile/toughestgameever2/sound/61677/
 https://mixkit.co/free-sound-effects/explosion/
 https://pixabay.com/sound-effects/search/heal/
 https://pixabay.com/sound-effects/search/denied/
+https://pixabay.com/sound-effects/search/bullet/

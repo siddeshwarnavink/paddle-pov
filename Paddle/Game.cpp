@@ -25,44 +25,44 @@ namespace Paddle {
 	static constexpr float PADDLE_SPEED = 0.05f;
 
 	static constexpr float WALL_LENGTH      = 10.0f;
-	static constexpr float WALL_SIDE_OFFSET = 3.0f;
+	static constexpr float WALL_SIDE_OFFSET = 5.0f;
 	static constexpr float WALL_BEHIND_POS  = 6.0f;
 
-        static constexpr int BULLET_MAX_TIME = 5;
+	static constexpr int BULLET_MAX_TIME = 5;
 
 	Game::Game() : window(WIDTH, HEIGHT, "Paddle POV") {
-		device    = new Vk::Device(window);
+		device = new Vk::Device(window);
 		swapChain = new Vk::SwapChain(*device, window.getExtent());
 
 		CreateDescriptorSetLayout();
 		CreateUniformBuffer();
 		CreateDescriptorPool();
 
-                auto* font = new GameFont(*device, descriptorPool, *swapChain);
+		auto* font = new GameFont(*device, descriptorPool, *swapChain);
 		context = new GameContext(
 			device,
 			new GameSounds(),
-                        font,
+			font,
 			new GameCamera(),
-                        new FlashText(*font, *swapChain));
+			new FlashText(*font, *swapChain));
 
 		CreateDescriptorSet();
 		CreatePipelineLayout();
 		CreatePipeline();
 		CreateGameEntities();
 
-                font->CreateVertexBuffer();
+		font->CreateVertexBuffer();
 	}
 
 	Game::~Game() {
 		DebugLog("Destroying game entities.");
-		DestroyPtrs<Block> (blocks);
-		DestroyPtrs<Loot>  (loots);
-		DestroyPtrs<Wall>  (walls);
-		DestroyPtrs<Bullet>  (bullets);
+		DestroyPtrs<Block>  (blocks);
+		DestroyPtrs<Loot>   (loots);
+		DestroyPtrs<Wall>   (walls);
+		DestroyPtrs<Bullet> (bullets);
 
-		DestroyPtr<Ball>         (ball);
-		DestroyPtr<PlayerPaddle> (paddle);
+		DestroyPtr<Ball>(ball);
+		DestroyPtr<PlayerPaddle>(paddle);
 
 		DebugLog("Destroying Vulkan resources.");
 		vkFreeCommandBuffers(device->device(), device->getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
@@ -80,9 +80,9 @@ namespace Paddle {
 		DestroyPtr<GameContext> (context);
 
 		DebugLog("Destroying Vulkan objects.");
-		DestroyPtr<Vk::Pipeline>  (pipeline);
-		DestroyPtr<Vk::SwapChain> (swapChain);
-		DestroyPtr<Vk::Device>    (device);
+		DestroyPtr<Vk::Pipeline>(pipeline);
+		DestroyPtr<Vk::SwapChain>(swapChain);
+		DestroyPtr<Vk::Device>(device);
 	}
 
 	void Game::CreateGameEntities() {
@@ -90,12 +90,14 @@ namespace Paddle {
 		ball   = new Ball(*context);
 		paddle = new PlayerPaddle(*context);
 
-		walls[0] = new Wall(*context, 6.0f, -WALL_SIDE_OFFSET, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
-		walls[1] = new Wall(*context, 6.0f, WALL_SIDE_OFFSET + 2.0f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
-		walls[2] = new Wall(*context, -4.0f, WALL_SIDE_OFFSET, 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
+		walls[0] = new Wall(*context, 6.0f , -WALL_SIDE_OFFSET      , 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+		walls[1] = new Wall(*context, 6.0f , WALL_SIDE_OFFSET * 1.5f, 0.0f, glm::vec3(WALL_LENGTH, 1.0f, 0.1f));
+		walls[2] = new Wall(*context, -4.0f, WALL_SIDE_OFFSET       , 0.0f, glm::vec3(0.1f, WALL_LENGTH, 1.0f));
+
+		walls[2]->SetRotation(glm::vec3(0.0f, 0.0f, glm::radians(90.0f)));
 	}
 
-	void EntityAddDeltaPos(GameEntity *entity, const glm::vec3& delta) {
+	void EntityAddDeltaPos(GameEntity* entity, const glm::vec3& delta) {
 		const auto pos = entity->GetPosition();
 		entity->SetPosition(pos + delta);
 	}
@@ -127,8 +129,8 @@ namespace Paddle {
 			if(deleteAll) shouldDelete = true;
 
 			if(shouldDelete) {
-				DebugLog(std::string(typeid(*entity).name()) + " marked for destruction");
-				PendingDestroyEntity pd{ entity->AsEntity(), currentFrame + MAX_FRAMES_IN_FLIGHT};
+				DebugLog(std::string(typeid(*entity).name()) + " marked fordestruction");
+				PendingDestroyEntity pd{ entity->AsEntity(), currentFrame + MAX_FRAMES_IN_FLIGHT };
 				destructionQueue.push_back(pd);
 				it = entities.erase(it);
 			}
@@ -144,22 +146,22 @@ namespace Paddle {
 		ball->Reset();
 		for(auto& wall : walls) wall->Reset();
 
-		UpdateDestructionQueue<Block> (blocks, currentFrame, true);
-		UpdateDestructionQueue<Loot>  (loots, currentFrame, true);
+		UpdateDestructionQueue<Block>(blocks, currentFrame, true);
+		UpdateDestructionQueue<Loot>(loots, currentFrame, true);
 		UpdateDestructionQueue<Bullet>(bullets, currentFrame, true);
 
 		Block::CreateBlocks(*context, blocks, loots);
 	}
 
-	void Game::RenderScoreFont(std::string scoreText,std::string livesText) {
-		const float width  = static_cast<float>(swapChain->width());
+	void Game::RenderScoreFont(std::string scoreText, std::string livesText) {
+		const float width = static_cast<float>(swapChain->width());
 		const float height = static_cast<float>(swapChain->height());
 
 		{
 			const float paddingX = 20.0f;
 			const float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
 
-			const float x = (-width / 2.0f)  + paddingX;
+			const float x = (-width / 2.0f) + paddingX;
 			const float y = (-height / 2.0f) + paddingY;
 			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
@@ -170,7 +172,7 @@ namespace Paddle {
 			const float paddingX = 20.0f;
 			const float paddingY = window.IsFullscreen() ? 60.0f : 40.0f;
 
-			const float x = (-width / 2.0f)  + paddingX;
+			const float x = (-width / 2.0f) + paddingX;
 			const float y = (-height / 2.3f) + paddingY;
 			const float fontSize = window.IsFullscreen() ? 1.0f : 0.5f;
 
@@ -180,10 +182,10 @@ namespace Paddle {
 	}
 
 	void Game::RenderGameOverFont(std::string scoreText) {
-		const float width  = static_cast<float>(swapChain->width());
+		const float width = static_cast<float>(swapChain->width());
 		const float height = static_cast<float>(swapChain->height());
 
-		const float scaleX = width  / 1080;
+		const float scaleX = width / 1080;
 		const float scaleY = height / 720;
 
 		context->font->AddText(FontFamily::FONT_FAMILY_TITLE, "Game Over", -280.0f * scaleX, -100.0f * scaleY, 2.0f * scaleX, glm::vec3(1.0f, 0.2f, 0.2f));
@@ -198,18 +200,18 @@ namespace Paddle {
 		context->gameSounds->PlayBgm();
 
 		bool prevPlayPaddleCollisionSound = false;
-		bool prevF10Pressed               = false;
-		bool prevGameOver                 = false;
-		int prevScore                     = -1;
-		glm::vec3 paddleMoveDelta         = glm::vec3(0.0f);
+		bool prevF10Pressed = false;
+		bool prevGameOver = false;
+		int prevScore = -1;
+		glm::vec3 paddleMoveDelta = glm::vec3(0.0f);
 
 		context->score = 0;
 
 		bool waitingForBlockReset = false;
-		time_t blockResetTime     = 0;
+		time_t blockResetTime = 0;
 
-		time_t lastCollision    = time(NULL);
-		uint32_t streak_count   = 0;
+		time_t lastCollision = time(NULL);
+		uint32_t streak_count = 0;
 		std::string livesText;
 
 		swapChain->recreate();
@@ -220,7 +222,7 @@ namespace Paddle {
 		while (!window.ShouldClose()) {
 			window.PollEvents();
 
-                        context->fm->Update();
+			context->fm->Update();
 
 			//
 			// Cleanup pending destroys
@@ -248,7 +250,7 @@ namespace Paddle {
 			// Fullscreen/windowed toggle
 			//
 			bool f10Pressed = window.IsKeyPressed(GLFW_KEY_F10);
-			if (f10Pressed && !prevF10Pressed) {
+			if(f10Pressed && !prevF10Pressed) {
 				window.ToggleFullscreen();
 				swapChain->recreate();
 				CreatePipeline();
@@ -256,8 +258,8 @@ namespace Paddle {
 				CreateCommandBuffers();
 			}
 
-			if (waitingForBlockReset) {
-				if (difftime(time(NULL), blockResetTime) >= 1) {
+			if(waitingForBlockReset) {
+				if(difftime(time(NULL), blockResetTime) >= 1) {
 					ResetEntities(currentFrame);
 					waitingForBlockReset = false;
 				}
@@ -267,31 +269,45 @@ namespace Paddle {
 			livesText = "Lives: " + std::to_string(context->lives);
 			if(context->lives <= 1) livesText = "";
 
-                        //
-                        // Check bullet timer
-                        //
-                        if(difftime(time(NULL), context->bulletResetTime) > BULLET_MAX_TIME) {
-                                context->bulletMode      = false;
-                                context->bulletResetTime = 0;
-                        }
+			//
+			// Check bullet timer
+			//
+			if(difftime(time(NULL), context->bulletResetTime) > BULLET_MAX_TIME) {
+				context->bulletMode = false;
+				context->bulletResetTime = 0;
+				context->gameSounds->StopSfx(SFX_BULLET);
+			}
 
 			//
-			// Destroy uncollected loot
+			// Destroy loots
 			//
-			for (auto& loot : loots)
-				if (loot->GetPosition().x > WALL_BEHIND_POS) loot->MarkForDestruction();
+			for(auto& loot : loots) {
+				bool didBulletCollide = false;
+				for(auto& bullet : bullets) {
+					if(bullet->CheckCollision(loot)) {
+						DebugLog("Bullet collision with loot detected");
+						didBulletCollide = true;
+						bullet->MarkForDestruction();
+						break;
+					}
+				}
+
+				if(loot->GetPosition().x > WALL_BEHIND_POS || didBulletCollide)
+					loot->MarkForDestruction();
+			}
 
 			//
 			// Game over logic
 			//
-			if (ball->GetPosition().x > WALL_BEHIND_POS) {
+			if(ball->GetPosition().x > WALL_BEHIND_POS) {
 				if(--context->lives >= 1) {
 					ball->Reset();
 					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
-				} else context->gameOver = true;
+				}
+				else context->gameOver = true;
 			}
 
-			if (!context->gameOver) {
+			if(!context->gameOver) {
 				ball->Update();
 				for(auto& loot : loots)     loot->Update();
 				for(auto& bullet : bullets) bullet->Update();
@@ -301,20 +317,20 @@ namespace Paddle {
 			// Block Collision
 			//
 			bool didBlockCollide = false;
-			for (auto& block : blocks) {
-				block->Update(); 
+			for(auto& block : blocks) {
+				block->Update();
 
-                                bool didBulletCollide = false;
-                                for(auto& bullet : bullets) {
-                                        if(bullet->CheckCollision(block)) {
-                                                DebugLog("Bullet collision with block detected");
-                                                didBulletCollide = true;
-                                                bullet->MarkForDestruction();
-                                                break;
-                                        }
-                                }
-                                                 
-				if (block->IsExploded()) {
+				bool didBulletCollide = false;
+				for(auto& bullet : bullets) {
+					if(bullet->CheckCollision(block)) {
+						DebugLog("Bullet collision with block detected");
+						didBulletCollide = true;
+						bullet->MarkForDestruction();
+						break;
+					}
+				}
+
+				if(block->IsExploded()) {
 					block->MarkForDestruction();
 
 					//
@@ -334,12 +350,12 @@ namespace Paddle {
 						context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 					}
 				}
-				else if (!block->IsExplosionInitiated() && (ball->CheckCollision(block) || didBulletCollide)) {
+				else if(!block->IsExplosionInitiated() && (ball->CheckCollision(block) || didBulletCollide)) {
 					didBlockCollide = true;
 					ball->OnCollision(block);
 					block->InitExplosion();
 
-					if (difftime(time(NULL), lastCollision) < 2) {
+					if(difftime(time(NULL), lastCollision) < 2) {
 						++streak_count;
 						DebugLog("Streak bonus: " + std::to_string(streak_count));
 					}
@@ -354,12 +370,12 @@ namespace Paddle {
 			//
 			// Streak bonus
 			//
-			if(!didBlockCollide &&  streak_count > 0) {
+			if(!didBlockCollide && streak_count > 0) {
 				const int bonusScore = ++streak_count * 10;
 				context->score += bonusScore;
 				streak_count = 0;
 
-                                context->fm->Flash("Bonus +" + std::to_string(bonusScore));
+				context->fm->Flash("Bonus +" + std::to_string(bonusScore));
 				context->gameSounds->PlaySfx(SFX_BONUS);
 			}
 
@@ -369,7 +385,7 @@ namespace Paddle {
 			// Paddle Collision
 			//
 			bool playPaddleCollisionSound = false;
-			if (ball->CheckCollision(paddle->AsEntity())) {
+			if(ball->CheckCollision(paddle->AsEntity())) {
 				DebugLog("Ball collision with paddle detected.");
 				ball->OnCollision(paddle->AsEntity());
 
@@ -393,14 +409,14 @@ namespace Paddle {
 			// Wall collision
 			//
 			for(auto& wall : walls) {
-                                for(auto& bullet : bullets) {
-                                        if(bullet->CheckCollision(wall)) {
-                                                DebugLog("Bullet collision with wall detected");
-                                                bullet->MarkForDestruction();
-                                        }
-                                }
+				for(auto& bullet : bullets) {
+					if(bullet->CheckCollision(wall)) {
+						DebugLog("Bullet collision with wall detected");
+						bullet->MarkForDestruction();
+					}
+				}
 
-				if (ball->CheckCollision(wall)) {
+				if(ball->CheckCollision(wall)) {
 					DebugLog("Ball collision with wall detected.");
 					ball->OnCollision(wall);
 					context->gameSounds->PlaySfx(SFX_WALL_BOUNCE);
@@ -410,15 +426,15 @@ namespace Paddle {
 			//
 			// Camera movement logic
 			//
-			if (!context->gameOver) {
+			if(!context->gameOver) {
 				glm::vec3 paddleDelta = glm::vec3(0.0f);
 
-				if (window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
+				if(window.IsKeyPressed(GLFW_KEY_LEFT) || window.IsKeyPressed(GLFW_KEY_A))
 					paddleDelta = glm::vec3(0.0f, PADDLE_SPEED, 0.0f);
-				if (window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
+				if(window.IsKeyPressed(GLFW_KEY_RIGHT) || window.IsKeyPressed(GLFW_KEY_D))
 					paddleDelta = glm::vec3(0.0f, -PADDLE_SPEED, 0.0f);
 
-				if (paddleDelta != glm::vec3(0.0f)) {
+				if(paddleDelta != glm::vec3(0.0f)) {
 					UpdateAllEntitiesPosition(paddleDelta);
 
 					bool willCollide = false;
@@ -430,57 +446,57 @@ namespace Paddle {
 						}
 					}
 
-					if (willCollide) UpdateAllEntitiesPosition(-paddleDelta);
+					if(willCollide) UpdateAllEntitiesPosition(-paddleDelta);
 				}
 			}
 
 
-                        //
-                        // Draw bullet
-                        //
-                        if(context->bulletMode && absoluteFrameNumber % 10 == 0) {
-                                auto pos = paddle->GetPosition();
-                                auto bullet = new Bullet(*context, pos.x, pos.y, pos.z);
-                                bullets.emplace_back(bullet);
-                        }
-
+			//
+			// Draw bullet
+			//
+			if(context->bulletMode && absoluteFrameNumber % 10 == 0) {
+				auto pos    = paddle->GetPosition();
+				auto bullet = new Bullet(*context, pos.x, pos.y, pos.z);
+				bullets.emplace_back(bullet);
+				context->gameSounds->PlaySfx(SFX_BULLET);
+			}
 
 			//
 			// Font rendering
 			//
 			context->font->ClearText();
-			if (context->gameOver) {
+			if(context->gameOver) {
 				RenderGameOverFont(scoreText);
 
 				//
 				// Game over keybindings
 				//
-				if (window.IsKeyPressed(GLFW_KEY_SPACE)) {
+				if(window.IsKeyPressed(GLFW_KEY_SPACE)) {
 					context->gameSounds->PlayBgm();
 					context->gameSounds->PlaySfx(SFX_BLOCKS_RESET);
 
 					ResetGame(currentFrame);
 					context->font->ClearText();
 					RenderScoreFont(scoreText, livesText);
-                                        context->fm->Draw();
+					context->fm->Draw();
 					context->font->CreateVertexBuffer();
 					prevScore = context->score;
 					prevGameOver = context->gameOver;
 					continue;
 				}
-				else if (window.IsKeyPressed(GLFW_KEY_ESCAPE)) {
+				else if(window.IsKeyPressed(GLFW_KEY_ESCAPE)) {
 					window.Close(); // TODO: Redirect to main menu once implemented.
 				}
 			}
 			else {
 				RenderScoreFont(scoreText, livesText);
-                                context->fm->Draw();
+				context->fm->Draw();
 			}
 
 			context->font->CreateVertexBuffer();
 
-			if (prevScore != context->score || prevGameOver != context->gameOver || prevF10Pressed != f10Pressed) {
-				if (prevGameOver != context->gameOver) {
+			if(prevScore != context->score || prevGameOver != context->gameOver || prevF10Pressed != f10Pressed) {
+				if(prevGameOver != context->gameOver) {
 					context->gameSounds->PauseBgm();
 					context->gameSounds->PlaySfx(SFX_GAME_OVER);
 				}
@@ -493,9 +509,9 @@ namespace Paddle {
 			//
 			// Move entites to destruction queue
 			//
-			UpdateDestructionQueue<Block>  (blocks, currentFrame);
-			UpdateDestructionQueue<Loot>   (loots,  currentFrame);
-			UpdateDestructionQueue<Bullet> (bullets, currentFrame);
+			UpdateDestructionQueue<Block> (blocks, currentFrame);
+			UpdateDestructionQueue<Loot>  (loots, currentFrame);
+			UpdateDestructionQueue<Bullet>(bullets, currentFrame);
 
 			CreateCommandBuffers();
 			DrawFrame();
@@ -517,7 +533,7 @@ namespace Paddle {
 		pipelineLayoutInfo.pushConstantRangeCount = 1;
 		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-		if (vkCreatePipelineLayout(device->device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+		if(vkCreatePipelineLayout(device->device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");
 		}
 	}
@@ -532,25 +548,25 @@ namespace Paddle {
 
 	static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
 		std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
-		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].binding  = 0;
 		attributeDescriptions[0].location = 0;
-		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+		attributeDescriptions[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[0].offset   = offsetof(Vertex, pos);
 
-		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].binding  = 0;
 		attributeDescriptions[1].location = 1;
-		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[1].offset = offsetof(Vertex, color);
+		attributeDescriptions[1].format   = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset   = offsetof(Vertex, color);
 
-		attributeDescriptions[2].binding = 0;
+		attributeDescriptions[2].binding  = 0;
 		attributeDescriptions[2].location = 2;
-		attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[2].offset = offsetof(Vertex, normal);
+		attributeDescriptions[2].format   = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[2].offset   = offsetof(Vertex, normal);
 
-		attributeDescriptions[3].binding = 0;
+		attributeDescriptions[3].binding  = 0;
 		attributeDescriptions[3].location = 3;
-		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
-		attributeDescriptions[3].offset = offsetof(Vertex, uv);
+		attributeDescriptions[3].format   = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[3].offset   = offsetof(Vertex, uv);
 
 		return attributeDescriptions;
 	}
@@ -587,31 +603,32 @@ namespace Paddle {
 		allocInfo.commandPool = context->device->getCommandPool();
 		allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
-		if (vkAllocateCommandBuffers(device->device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+		if(vkAllocateCommandBuffers(device->device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
 			throw std::runtime_error("failed to allocate command buffers");
 		}
 
-		for (int i = 0; i < commandBuffers.size(); i++) {
+		for(int i = 0; i < commandBuffers.size(); i++) {
 			VkCommandBufferBeginInfo beginInfo{};
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-			if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
+			if(vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
 				throw std::runtime_error("failed to begin recording command buffer");
 			}
 
 			VkRenderPassBeginInfo renderPassInfo{};
-			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			renderPassInfo.renderPass = swapChain->getRenderPass();
+			renderPassInfo.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassInfo.renderPass  = swapChain->getRenderPass();
 			renderPassInfo.framebuffer = swapChain->getFrameBuffer(i);
 
 			renderPassInfo.renderArea.offset = { 0, 0 };
 			renderPassInfo.renderArea.extent = swapChain->getSwapChainExtent();
 
 			std::array<VkClearValue, 2> clearValues{};
-			clearValues[0].color = { 0.1f, 0.1f, 0.1f, 1.0f };
+			clearValues[0].color        = { 0.07f, 0.09f, 0.13f, 1.0f }; // #121724
 			clearValues[1].depthStencil = { 1.0f, 0 };
+
 			renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-			renderPassInfo.pClearValues = clearValues.data();
+			renderPassInfo.pClearValues    = clearValues.data();
 
 			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -620,21 +637,22 @@ namespace Paddle {
 			//
 			// Draw all entities
 			//
-			for (auto& block : blocks)
+
+			for(auto& block : blocks)
 				block->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			ball->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
-			for (auto& loot : loots)
+			for(auto& loot : loots)
 				loot->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
-                        for (auto& bullet : bullets)
-                                bullet->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
+			for(auto& bullet : bullets)
+				bullet->Draw(commandBuffers[i], pipelineLayout, cameraDescriptorSet);
 
 			context->font->Draw(commandBuffers[i]);
 
 			vkCmdEndRenderPass(commandBuffers[i]);
-			if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+			if(vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
 				throw std::runtime_error("failed to record command buffer");
 			}
 		}
@@ -643,12 +661,12 @@ namespace Paddle {
 	void Game::DrawFrame() {
 		uint32_t imageIndex;
 		auto result = swapChain->acquireNextImage(&imageIndex);
-		if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		if(result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 			throw std::runtime_error("failed to acquire swap chain image");
 		}
 		UpdateUniformBuffer(imageIndex);
 		result = swapChain->submitCommandBuffers(&commandBuffers[imageIndex], &imageIndex);
-		if (result != VK_SUCCESS) {
+		if(result != VK_SUCCESS) {
 			throw std::runtime_error("failed to present swap chain image");
 		}
 	}
@@ -665,12 +683,14 @@ namespace Paddle {
 
 	void Game::UpdateUniformBuffer(uint32_t currentImage) {
 		CameraUbo ubo{};
-		glm::vec3 camPos = context->camera->GetPosition();
+		glm::vec3 camPos    = context->camera->GetPosition();
 		glm::vec3 camTarget = context->camera->GetTarget();
 		ubo.view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 0.0f, 1.0f));
+
 		float aspect = float(swapChain->width()) / float(swapChain->height());
 		ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;
+
 		void* data;
 		vkMapMemory(device->device(), cameraUboMemory, 0, sizeof(ubo), 0, &data);
 		memcpy(data, &ubo, sizeof(ubo));
@@ -684,7 +704,7 @@ namespace Paddle {
 		allocInfo.descriptorSetCount = 1;
 		allocInfo.pSetLayouts = &descriptorSetLayout;
 
-		if (vkAllocateDescriptorSets(device->device(), &allocInfo, &cameraDescriptorSet) != VK_SUCCESS) {
+		if(vkAllocateDescriptorSets(device->device(), &allocInfo, &cameraDescriptorSet) != VK_SUCCESS) {
 			throw std::runtime_error("failed to allocate camera descriptor set!");
 		}
 
@@ -694,41 +714,41 @@ namespace Paddle {
 		bufferInfo.range = sizeof(CameraUbo);
 
 		VkWriteDescriptorSet descriptorWriteUBO{};
-		descriptorWriteUBO.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWriteUBO.dstSet = cameraDescriptorSet;
-		descriptorWriteUBO.dstBinding = 0;
+		descriptorWriteUBO.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWriteUBO.dstSet          = cameraDescriptorSet;
+		descriptorWriteUBO.dstBinding      = 0;
 		descriptorWriteUBO.dstArrayElement = 0;
-		descriptorWriteUBO.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWriteUBO.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		descriptorWriteUBO.descriptorCount = 1;
-		descriptorWriteUBO.pBufferInfo = &bufferInfo;
+		descriptorWriteUBO.pBufferInfo     = &bufferInfo;
 
 		vkUpdateDescriptorSets(device->device(), 1, &descriptorWriteUBO, 0, nullptr);
 	}
 
 	void Game::CreateDescriptorSetLayout() {
 		VkDescriptorSetLayoutBinding uboLayoutBinding{};
-		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		uboLayoutBinding.binding            = 0;
+		uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uboLayoutBinding.descriptorCount    = 1;
+		uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
 
 		VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-		samplerLayoutBinding.binding = 1;
-		samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		samplerLayoutBinding.descriptorCount = 1;
-		samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		samplerLayoutBinding.binding            = 1;
+		samplerLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerLayoutBinding.descriptorCount    = 1;
+		samplerLayoutBinding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
 		samplerLayoutBinding.pImmutableSamplers = nullptr;
 
 		std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
 			uboLayoutBinding, samplerLayoutBinding
 		};
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutInfo.pBindings = bindings.data();
+		layoutInfo.pBindings    = bindings.data();
 
-		if (vkCreateDescriptorSetLayout(device->device(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+		if(vkCreateDescriptorSetLayout(device->device(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor set layout!");
 		}
 	}
@@ -738,18 +758,18 @@ namespace Paddle {
 		const size_t numSets = 1 + numFonts;
 
 		std::array<VkDescriptorPoolSize, 2> poolSizes{};
-		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		poolSizes[0].descriptorCount = static_cast<uint32_t>(numSets);
-		poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		poolSizes[1].descriptorCount = static_cast<uint32_t>(numSets);
 
 		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-		poolInfo.pPoolSizes = poolSizes.data();
-		poolInfo.maxSets = static_cast<uint32_t>(numSets);
+		poolInfo.pPoolSizes    = poolSizes.data();
+		poolInfo.maxSets       = static_cast<uint32_t>(numSets);
 
-		if (vkCreateDescriptorPool(device->device(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+		if(vkCreateDescriptorPool(device->device(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor pool");
 		}
 	}

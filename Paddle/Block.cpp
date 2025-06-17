@@ -11,78 +11,59 @@
 
 using Utils::RandomChance;
 using Utils::RandomNumber;
+using Utils::DebugLog;
 
 namespace Paddle {
-	static constexpr int   BLOCK_ROWS    = 3;
-	static constexpr int   BLOCK_CoLs    = 8;
-	static constexpr float BLOCK_SPACING = 0.65f;
+	static constexpr int   BLOCK_ROWS = 3;
+	static constexpr int   BLOCK_COLS = 8;
+	static constexpr float BLOCK_SPACING = 1.15f;
 
-	static constexpr float LOOT_PROB    = 0.2f;
-	static constexpr float TNT_PROB     = 0.2f;
+	static constexpr float LOOT_PROB = 0.15f;
+	static constexpr float TNT_PROB = 0.2f;
 	static constexpr float RAINBOW_PROB = 0.05f;
+
+	static const std::vector<glm::vec3> colors = {
+		{15.0f / 255.0f, 30.0f / 255.0f, 63.0f / 255.0f},    // Dark Blue - #0f1e3f
+		{213.0f / 255.0f, 21.0f / 255.0f, 24.0f / 255.0f},   // Bright Red - #d51518
+		{251.0f / 255.0f, 229.0f / 255.0f, 74.0f / 255.0f},  // Bright Yellow - #fbe54a
+		{38.0f / 255.0f, 109.0f / 255.0f, 45.0f / 255.0f},   // Dark Green - #266d2d
+		{242.0f / 255.0f, 242.0f / 255.0f, 242.0f / 255.0f}, // White - #f2f2f2
+	};
 
 	Block::Block(GameContext& context, float x, float y, float z, const glm::vec3& color) : GameEntity(context) {
 		allBlocksRef = nullptr;
-		allLootsRef = nullptr;
-
-		verticesInstance = {
-			// Front face
-			{{-0.25f, -0.25f,  0.25f}, {0,0,0}, {0,0,1}, {0,0}},
-			{{ 0.25f, -0.25f,  0.25f}, {0,0,0}, {0,0,1}, {1,0}},
-			{{ 0.25f,  0.25f,  0.25f}, {0,0,0}, {0,0,1}, {1,1}},
-			{{-0.25f,  0.25f,  0.25f}, {0,0,0}, {0,0,1}, {0,1}},
-			// Back face
-			{{-0.25f, -0.25f, -0.25f}, {0,0,0}, {0,0,-1}, {1,0}},
-			{{ 0.25f, -0.25f, -0.25f}, {0,0,0}, {0,0,-1}, {0,0}},
-			{{ 0.25f,  0.25f, -0.25f}, {0,0,0}, {0,0,-1}, {0,1}},
-			{{-0.25f,  0.25f, -0.25f}, {0,0,0}, {0,0,-1}, {1,1}},
-		};
-		indicesInstance = {
-			0, 1, 2, 2, 3, 0,  // Front face
-			1, 5, 6, 6, 2, 1,  // Right face
-			5, 4, 7, 7, 6, 5,  // Back face
-			4, 0, 3, 3, 7, 4,  // Left face
-			3, 2, 6, 6, 7, 3,  // Top face
-			4, 5, 1, 1, 0, 4   // Bottom face
-		};
-
-		glm::vec3 applyColor = color;
+		allLootsRef  = nullptr;
+		
+		tintColor = glm::vec4(color, 1);
+		
+		isExploded           = false;
+		isExplosionInitiated = false;
 
 		isTNTBlock = RandomChance(TNT_PROB);
-		if(isTNTBlock)
-			applyColor = glm::vec3(0.0f);
+		if(isTNTBlock) tintColor = glm::vec4(0.0f);
 
 		isRainbowBlock = RandomChance(RAINBOW_PROB);
-		if (isRainbowBlock) {
-			applyColor = glm::vec3(1.0f, 0.0f, 1.0f);
+		if(isRainbowBlock) {
+			lastColoChangeTime = time(NULL);
 			isTNTBlock = false;
 		}
 
-		for (auto& v : verticesInstance) v.color = applyColor;
-
+		SetScale(glm::vec3(0.2f));
+		SetRotation(glm::vec3(glm::radians(-90.0f), 0.0f, 0.0f));
 		SetPosition(glm::vec3(x, y, z));
-		InitialiseEntity();
 
-		isExploded = false;
-		isExplosionInitiated = false;
+		LoadModel("Shader\\Brick.obj");
+		InitialiseEntity();
 	}
 
 	void Block::CreateBlocks(GameContext& context, std::vector<Block*>& blocks, std::vector<Loot*>& loots) {
 		const float startX = -BLOCK_SPACING * 2;
 		const float startY = -BLOCK_SPACING * 2;
 
-		const std::vector<glm::vec3> colors = {
-			{124.0f / 255.0f, 156.0f / 255.0f, 228.0f / 255.0f}, // #7c9ce4
-			{100.0f / 255.0f, 230.0f / 255.0f, 215.0f / 255.0f}, // #64e6d7
-			{231.0f / 255.0f, 235.0f / 255.0f, 185.0f / 255.0f}, // #e7ebb9
-			{179.0f / 255.0f, 240.0f / 255.0f, 255.0f / 255.0f}, // #b3f0ff
-			{30.0f / 255.0f, 151.0f / 255.0f, 158.0f / 255.0f},  // #1e979e
-		};
-		const int random = RandomNumber(0, static_cast<int>(colors.size()) - 1);
-
-		blocks.reserve(BLOCK_ROWS * BLOCK_CoLs);
+		blocks.reserve(BLOCK_ROWS * BLOCK_COLS);
 		for (size_t i = 0; i < BLOCK_ROWS; ++i) {
-			for (size_t j = 0; j < BLOCK_CoLs; ++j) {
+			for (size_t j = 0; j < BLOCK_COLS; ++j) {
+				const int random = RandomNumber(0, static_cast<int>(colors.size()) - 1);
 				const float x = startX + i * BLOCK_SPACING;
 				const float y = startY + j * BLOCK_SPACING;
 				glm::vec3 color = colors[random];
@@ -104,7 +85,7 @@ namespace Paddle {
 		//
 		// Spawn Loot
 		//
-		if(RandomChance(LOOT_PROB) && allLootsRef) {
+		if (RandomChance(LOOT_PROB) && allLootsRef) {
 			const auto lootPosition = this->GetPosition();
 			auto loot = new Loot(context, lootPosition.x, lootPosition.y, lootPosition.z);
 			allLootsRef->emplace_back(loot);
@@ -169,12 +150,19 @@ namespace Paddle {
 	}
 
 	void Block::Update() {
-		if (!isExplosionInitiated || isExploded) return;
+		if(isRainbowBlock) {
+			if(difftime(time(NULL), lastColoChangeTime) > 0.05f) {
+				lastColoChangeTime = time(NULL);
+				const int random = RandomNumber(0, static_cast<int>(colors.size()) - 1);
+				tintColor = glm::vec4(colors[random], 1.0f);
+				UpdateVertexColors(tintColor);
+			}
+		}
+		if(!isExplosionInitiated || isExploded) return;
 
 		const float deltaTime = 0.01f;
 		bool allGone = true;
 		std::vector<CubePiece> newSubPieces;
-
 
 		for (auto& piece : explodedPieces) {
 			piece.position += piece.velocity * deltaTime;

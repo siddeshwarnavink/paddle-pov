@@ -140,6 +140,12 @@
     <ClInclude Include="Bullet.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Vendor\tiny_obj_loader.h">
+      <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="Vendor\miniaudio.h">
+      <Filter>Header Files\Vendor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="compile_shaders.bat">

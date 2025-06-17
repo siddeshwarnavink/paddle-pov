@@ -1,5 +1,6 @@
 #include "Ball.hpp"
 #include "VkDevice.hpp"
+#include "Bullet.hpp"
 
 #include <glm/gtc/constants.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -43,7 +44,10 @@ namespace Paddle {
 	}
 
 	void Ball::OnCollision(GameEntity* other) {
-		if (auto* boundedEntity = dynamic_cast<IBounded*>(other)) {
+                IBounded* boundedEntity = dynamic_cast<IBounded*>(other);
+                Bullet* bulletEntity    = dynamic_cast<Bullet*>(other);
+
+		if (boundedEntity && !bulletEntity) {
 			auto* entity = dynamic_cast<GameEntity*>(other);
 			glm::vec3 blockMin = entity->GetPosition() - boundedEntity->GetHalfExtents();
 			glm::vec3 blockMax = entity->GetPosition() + boundedEntity->GetHalfExtents();
